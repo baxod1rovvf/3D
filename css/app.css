@@ -353,3 +353,13 @@ img { display: block; max-width: 100%; }
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
   @view-transition { navigation: none; }
 }
+
+/* ---------- Device pairing code ---------- */
+.pair-code { display: flex; justify-content: center; gap: 8px; margin: 6px 0; }
+.pair-code span {
+  width: 44px; height: 58px; border-radius: 12px;
+  display: grid; place-items: center;
+  background: var(--surface-2); border: 1px solid var(--line-2);
+  font-family: var(--serif); font-size: 30px; font-weight: 500; color: var(--ink);
+}
+.pair-input { text-align: center; letter-spacing: .5em; font-size: 24px; font-weight: 600; padding-left: calc(14px + .5em); }

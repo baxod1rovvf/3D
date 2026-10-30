@@ -193,13 +193,15 @@
         <a href="index.html" class="logo" aria-label="Oila Uchun — bosh sahifa">${logoSvg()}</a>
         <span style="flex:1"></span>
         <button class="icon-btn" id="bell" aria-label="Bildirishnomalar"><i data-lucide="bell"></i><span class="dot" hidden></span></button>
-        <button class="avatars" id="me-btn" aria-label="Profil" style="border:0;background:none;padding:0">${people}</button>
+        <button class="icon-btn" id="settings-btn" aria-label="Sozlamalar"><i data-lucide="settings"></i></button>
+        <button class="avatars" id="me-btn" aria-label="Sozlamalar" style="border:0;background:none;padding:0">${people}</button>
       </header>`;
     }
     return `<header class="topbar">
       <h1>${esc(title)}${sub ? `<span class="sub">${esc(sub)}</span>` : ""}</h1>
       <button class="icon-btn" id="bell" aria-label="Bildirishnomalar"><i data-lucide="bell"></i><span class="dot" hidden></span></button>
-      <button class="avatars" id="me-btn" aria-label="Profil" style="border:0;background:none;padding:0">${people}</button>
+        <button class="icon-btn" id="settings-btn" aria-label="Sozlamalar"><i data-lucide="settings"></i></button>
+      <button class="avatars" id="me-btn" aria-label="Sozlamalar" style="border:0;background:none;padding:0">${people}</button>
     </header>`;
   }
   function logoSvg() {
@@ -216,35 +218,87 @@
         <span class="pill"><i data-lucide="${t.icon}"></i></span><span>${t.label}</span></a>`).join("")}</nav>`;
   }
 
-  /** Copy or share the private family link that connects the partner's phone. */
-  async function shareFamilyLink() {
-    const link = Store.familyLink();
-    if (navigator.share) {
-      try { await navigator.share({ title: "Oila Uchun", text: "Oilamiz sahifasi — shu havolani oching:", url: link }); return; } catch (e) { if (e.name === "AbortError") return; }
-    }
-    try { await navigator.clipboard.writeText(link); toast("Havola nusxalandi. Juftingizga yuboring.", "copy"); }
-    catch (e) { prompt("Havolani nusxalang:", link); }
+  /* ---------- device pairing ---------- */
+  /** HTML for a code box; the caller fills it with Store.createPairCode(). */
+  const codeDigits = (code) => `<div class="pair-code" aria-label="Ulash kodi ${esc(code.split("").join(" "))}">${code.split("").map((d) => `<span>${esc(d)}</span>`).join("")}</div>`;
+
+  /** "Qurilmani ulash": show a 6-digit code the partner types on their phone. */
+  async function showPairCode(target) {
+    const render = async (box) => {
+      box.innerHTML = `<div class="skeleton" style="height:64px;margin:6px 0"></div>`;
+      let code;
+      try { code = await Store.createPairCode(); }
+      catch (e) { console.error(e); box.innerHTML = `<p class="error-text">Kod olinmadi. Internetni tekshirib, qayta urinib ko'ring.</p>`; return; }
+      box.innerHTML = `${codeDigits(code)}
+        <p class="hint" style="text-align:center;margin:10px 0 0">Juftingiz o'z telefonida <b>«Menda kod bor»</b>ni bosib, shu kodni kiritadi. Kod 10 daqiqa va faqat bir marta ishlaydi.</p>
+        <button class="link-btn" data-new style="display:block;margin:8px auto 0">Yangi kod olish</button>`;
+      $("[data-new]", box).addEventListener("click", () => render(box));
+    };
+    if (target) return render(target);
+    sheet({
+      title: "Qurilmani ulash",
+      body: `<div data-box></div>`,
+      foot: `<button class="btn primary" data-close>Tayyor</button>`,
+      onMount(el) { render($("[data-box]", el)); },
+    });
+  }
+
+  /** "Menda kod bor": type the partner's code; this phone joins their family. */
+  function enterPairCode({ inline, onJoined } = {}) {
+    const html = `<form data-pair novalidate>
+        <div class="field"><label for="pair-in">Juftingiz telefonidagi kod</label>
+          <input class="input pair-input" id="pair-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" autofocus>
+          <span class="hint">Juftingiz telefonida: Sozlamalar → «Qurilmani ulash».</span></div>
+        <p class="error-text" data-err hidden></p>
+        <button class="btn primary block" type="submit">Ulash</button>
+      </form>`;
+    const wire = (root, done) => {
+      const f = $("[data-pair]", root), err = $("[data-err]", root), inp = $("#pair-in", root);
+      inp.addEventListener("input", () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 6); err.hidden = true; });
+      f.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const code = inp.value.trim();
+        if (code.length !== 6) { err.textContent = "Kod 6 ta raqamdan iborat."; err.hidden = false; return; }
+        const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
+        try {
+          const k = await Store.claimPairCode(code);
+          if (!k || !(await Store.joinFamily(k))) { err.textContent = "Kod noto'g'ri yoki eskirgan. Juftingizdan yangi kod so'rang."; err.hidden = false; btn.disabled = false; return; }
+          Store.Device.del("oila-me");
+          done && done(); onJoined ? onJoined() : (location.href = "kirish.html");
+        } catch (ex) {
+          console.error(ex);
+          err.textContent = /too_many/.test(ex.message || "") ? "Juda ko'p urinish bo'ldi. 10 daqiqadan so'ng qayta urinib ko'ring." : "Ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.";
+          err.hidden = false; btn.disabled = false;
+        }
+      });
+      setTimeout(() => inp.focus(), 300);
+    };
+    if (inline) { inline.innerHTML = html; wire(inline); return; }
+    sheet({ title: "Menda kod bor", body: html, onMount(el, api) { wire(el, () => api.close()); } });
   }
 
   function openProfile() {
     const c = Store.ctx;
     const demo = Store.mode === "demo";
     sheet({
-      title: "Oila",
+      title: "Sozlamalar",
       body: `<div class="card list">
           <div class="row">${avatar(c.profile)}<div class="grow"><div class="title">${esc(c.profile.full_name)} <span class="chip">Siz</span></div><div class="meta">${c.profile.role === "er" ? "Er" : "Xotin"}</div></div></div>
           ${c.partner ? `<div class="row">${avatar(c.partner)}<div class="grow"><div class="title">${esc(c.partner.full_name)}</div><div class="meta">${c.partner.role === "er" ? "Er" : "Xotin"}</div></div></div>` : ""}
         </div>
-        <div class="section"><div class="section-head"><h2>${esc(c.household.name)}</h2></div>
-          <button class="btn ghost block" data-share><i data-lucide="link"></i>Oila havolasini yuborish</button>
-          <p class="hint" style="margin:8px 2px 0">Ikkinchi telefonni ulash uchun shu havolani juftingizga yuboring. Havolani boshqa hech kimga bermang — u oilangiz sahifasining kaliti.</p></div>
+        <div class="section"><div class="section-head"><h2>Qurilmalar</h2></div>
+          <div class="card list">
+            <button class="row" data-pair-show style="width:100%;border:0;background:none;text-align:left"><i data-lucide="smartphone"></i><div class="grow"><div class="title">Qurilmani ulash</div><div class="meta">Juftingiz telefoni uchun kod olish</div></div><i data-lucide="chevron-right"></i></button>
+            <button class="row" data-pair-enter style="width:100%;border:0;background:none;text-align:left"><i data-lucide="keyboard"></i><div class="grow"><div class="title">Menda kod bor</div><div class="meta">Juftingiz bergan kodni kiritish</div></div><i data-lucide="chevron-right"></i></button>
+          </div></div>
         ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefon o'rtasida ulashish uchun js/config.js ga Supabase manzili va kalitini yozing.</p>` : ""}`,
       foot: `${c.partner ? `<button class="btn ghost" data-switch><i data-lucide="repeat"></i>Men ${esc(firstName(c.partner))}man</button>` : ""}<button class="btn danger" data-out><i data-lucide="unplug"></i>Uzish</button>`,
       onMount(el, api) {
-        $("[data-share]", el).addEventListener("click", shareFamilyLink);
+        $("[data-pair-show]", el).addEventListener("click", () => { api.close(); setTimeout(() => showPairCode(), 300); });
+        $("[data-pair-enter]", el).addEventListener("click", () => { api.close(); setTimeout(() => enterPairCode(), 300); });
         $("[data-out]", el).addEventListener("click", async () => {
           api.close();
-          if (!(await confirmSheet("Bu telefon oiladan uziladi. Ma'lumotlar o'chmaydi — havola orqali qayta ulanish mumkin.", "Telefonni uzish"))) return;
+          if (!(await confirmSheet("Bu telefon oiladan uziladi. Ma'lumotlar o'chmaydi — juftingiz bergan kod bilan qayta ulanish mumkin.", "Telefonni uzish"))) return;
           Store.forgetDevice(); location.href = "kirish.html";
         });
         const sw = $("[data-switch]", el);
@@ -291,6 +345,7 @@
     app.insertAdjacentHTML("beforeend", tabbar(opts.page));
     $("#bell").addEventListener("click", openNotifications);
     $("#me-btn").addEventListener("click", openProfile);
+    $("#settings-btn").addEventListener("click", openProfile);
     icons();
 
     await refreshBell();
@@ -313,7 +368,7 @@
   }
 
   window.App = {
-    boot, sheet, shareFamilyLink, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
+    boot, sheet, showPairCode, enterPairCode, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
     person, nameOf, firstName, isMe, avatar, timeAgo, greeting,
     ymd, parseYmd, today, addDays, fmtLong, fmtDate, fmtShort,
     MONTHS, WEEKDAYS, WEEKDAYS_SHORT, logoSvg,

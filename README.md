@@ -4,9 +4,11 @@ A mobile-only family website for a husband and wife: groceries, a weekly meal pl
 
 There is **no sign-in**. The site is for one family only:
 1. The first phone sets up the family by entering both names.
-2. That phone sends the private **family link** to the partner.
-3. The partner opens the link once.
-4. Each phone asks once "whose phone is this?" and remembers the answer.
+2. On that phone, **Sozlamalar (⚙) → Qurilmani ulash** shows a 6-digit code.
+3. On the partner's phone, tap **Menda kod bor** (on the welcome screen, or in Sozlamalar) and type the code.
+4. Each phone asks once "whose phone is this?" and remembers the answer. From then on both phones share the same data.
+
+A code works once and expires after 10 minutes. If it expires, tap **Yangi kod olish** for a new one.
 
 ## Pages (separate HTML files, linked by the bottom tab bar)
 
@@ -17,7 +19,7 @@ There is **no sign-in**. The site is for one family only:
 | `taomlar.html` | Taomlar menyusi: 7-day planner (nonushta / tushlik / kechki), favourites, past meals, *send ingredients to Ro'zg'or* |
 | `xotiralar.html` | Oilaviy xotiralar: private photo timeline and gallery |
 | `uy-ishlari.html` | Uy ishlari: today / upcoming / completed, assignee, priority, reminders |
-| `kirish.html` | First-time setup, the family link, and "whose phone is this?" |
+| `kirish.html` | First-time setup, entering a pairing code, and "whose phone is this?" |
 
 Shared code is in `css/app.css`, `js/app.js` (shell, tab bar, sheets, notifications) and `js/store.js` (data layer). The database setup is `supabase/schema.sql`.
 
@@ -27,7 +29,9 @@ Shared code is in `css/app.css`, `js/app.js` (shell, tab bar, sheets, notificati
 2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, and press **Run**.
 3. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into `js/config.js` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
 4. Host the site folder as static files. GitHub Pages, Netlify or Cloudflare Pages are all free.
-5. On the first phone, open the site, enter both names, and tap **Oilani boshlash**. Then tap **Havolani yuborish** to send the family link to your partner. You can share the link again later from the avatars at the top right.
+5. On the first phone, open the site, enter both names, and tap **Oilani boshlash**. A 6-digit code appears. On the partner's phone, open the site, tap **Menda kod bor**, and type it in. You can get a new code any time in **Sozlamalar → Qurilmani ulash**.
+
+If you already ran `schema.sql` before pairing codes were added, run it again. It's safe to re-run, and it adds the pairing functions.
 
 Changes reach the other phone right away through Supabase Realtime broadcast. Memory photos are compressed and saved in the `photos` table, so no Storage bucket is needed. The free plan's 500 MB database holds a couple of thousand photos.
 
@@ -35,9 +39,9 @@ Note: Supabase pauses free projects after about a week with no use. A family tha
 
 ## Privacy
 
-- The family link contains a long random key: `kirish.html#k=<key>`. The site sends it with every request as the `x-family-key` header, and Row Level Security only returns rows whose `household_id` equals it. Without the link, every table looks empty.
-- **Treat the link like a house key: share it only with your partner.** Anyone who has it can open the family's data.
-- The **Uzish** button in the family sheet disconnects a phone. The data stays, and the link reconnects it.
+- Each family has a long random secret key, which each phone keeps after setup or pairing. The site sends it with every request as the `x-family-key` header, and Row Level Security only returns rows whose `household_id` equals it. Without the key, every table looks empty.
+- A pairing code hands that key to the partner's phone. Codes are single-use, expire after 10 minutes, and the site allows at most 30 wrong guesses per 10 minutes, so they can't be guessed in practice. **Only type a code on your own family's phones.**
+- The **Uzish** button in Sozlamalar disconnects a phone. The data stays, and a new code reconnects it.
 
 ## Alternative: Cloudflare Worker + D1
 

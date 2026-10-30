@@ -89,6 +89,12 @@
         return k;
       },
 
+      async createPairCode() { return (await call("/pair", { method: "POST", body: {} })).code; },
+      async claimPairCode(code) {
+        try { return (await call("/pair/claim", { method: "POST", k: null, body: { code } })).key || null; }
+        catch (e) { if (e.status === 404) return null; throw e; }
+      },
+
       async list(table, opts = {}) {
         const qs = table === "notifications" ? `?recipient_id=${encodeURIComponent(profile.id)}` : "";
         return sortRows(await call(`/rows/${table}${qs}`), opts);
@@ -187,6 +193,12 @@
         ]));
         Device.set("oila-family-key", k);
         return k;
+      },
+
+      async createPairCode() { const c = await client(); return check(await c.rpc("create_pair_code")); },
+      async claimPairCode(code) {
+        const c = await client(null);
+        return check(await c.rpc("claim_pair_code", { p_code: code })) || null;
       },
 
       async list(table, opts = {}) {
@@ -341,6 +353,18 @@
       async createFamily({ familyName, wifeName, husbandName }) {
         write(seed(wifeName, husbandName, familyName));
         Device.set("oila-family-key", HH);
+        return HH;
+      },
+
+      async createPairCode() {
+        const code = String(Math.floor(Math.random() * 1e6)).padStart(6, "0");
+        localStorage.setItem("oila-demo-pair", JSON.stringify({ code, until: Date.now() + 600000 }));
+        return code;
+      },
+      async claimPairCode(code) {
+        let p; try { p = JSON.parse(localStorage.getItem("oila-demo-pair")); } catch (e) {}
+        if (!p || p.code !== code || p.until < Date.now()) return null;
+        localStorage.removeItem("oila-demo-pair");
         return HH;
       },
 

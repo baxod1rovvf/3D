@@ -13,6 +13,8 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS records (id TEXT PRIMARY KEY, household_id TEXT NOT NULL, tbl TEXT NOT NULL, data TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS records_family ON records (household_id, tbl)`,
   `CREATE TABLE IF NOT EXISTS versions (household_id TEXT NOT NULL, tbl TEXT NOT NULL, v INTEGER NOT NULL, PRIMARY KEY (household_id, tbl))`,
+  `CREATE TABLE IF NOT EXISTS pair_codes (code TEXT PRIMARY KEY, household_id TEXT NOT NULL, expires_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS pair_failures (at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS photos (id TEXT PRIMARY KEY, household_id TEXT NOT NULL, bytes BLOB NOT NULL, created_at TEXT NOT NULL)`,
 ];
 
@@ -73,10 +75,36 @@ async function route(request, db) {
     return json({ key });
   }
 
+  // The other phone enters a 6-digit code and receives the family key. Codes work once.
+  if (parts[0] === "pair" && parts[1] === "claim" && method === "POST") {
+    const { code } = await request.json();
+    const t = Date.now();
+    await db.prepare(`DELETE FROM pair_failures WHERE at < ?`).bind(t - 600000).run();
+    const { n } = await db.prepare(`SELECT COUNT(*) AS n FROM pair_failures`).first();
+    if (n >= 30) return fail(429, "too_many_attempts");
+    const row = await db.prepare(`SELECT household_id FROM pair_codes WHERE code = ? AND expires_at > ?`).bind(String(code || "").trim(), t).first();
+    if (!row) { await db.prepare(`INSERT INTO pair_failures (at) VALUES (?)`).bind(t).run(); return fail(404, "code not found"); }
+    await db.prepare(`DELETE FROM pair_codes WHERE code = ?`).bind(String(code).trim()).run();
+    return json({ key: row.household_id });
+  }
+
   const key = request.headers.get("X-Family-Key") || url.searchParams.get("k");
   if (!key || key.length < 30) return fail(401, "family key required");
   const household = await db.prepare(`SELECT key AS id, name, created_at FROM households WHERE key = ?`).bind(key).first();
   if (!household) return fail(404, "family not found");
+
+  // "Qurilmani ulash": a fresh 6-digit code for this family, valid 10 minutes.
+  if (parts[0] === "pair" && !parts[1] && method === "POST") {
+    const t = Date.now();
+    await db.prepare(`DELETE FROM pair_codes WHERE expires_at < ? OR household_id = ?`).bind(t, key).run();
+    for (;;) {
+      const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
+      const taken = await db.prepare(`SELECT 1 FROM pair_codes WHERE code = ?`).bind(code).first();
+      if (taken) continue;
+      await db.prepare(`INSERT INTO pair_codes (code, household_id, expires_at) VALUES (?, ?, ?)`).bind(code, key, t + 600000).run();
+      return json({ code });
+    }
+  }
 
   // Family name and both members.
   if (parts[0] === "family" && method === "GET") {

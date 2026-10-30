@@ -57,9 +57,12 @@ function setupView() {
       <p class="error-text" id="err" hidden></p>
       <button class="btn primary block" type="submit">Oilani boshlash</button>
     </form>
-    <button class="link-btn" id="have-link" style="display:block;margin:16px auto 0">Menda oila havolasi bor</button>`;
+    <div style="display:flex;align-items:center;gap:10px;margin:18px 0 12px;color:var(--muted);font-size:13px"><span style="flex:1;height:1px;background:var(--line)"></span>yoki<span style="flex:1;height:1px;background:var(--line)"></span></div>
+    <button class="btn ghost block" id="have-code"><i data-lucide="keyboard"></i>Menda kod bor</button>
+    <p class="hint" style="text-align:center;margin-top:8px">Juftingiz oilani allaqachon boshlagan bo'lsa, uning telefonidagi kodni kiriting.</p>`;
   const f = $("#f", view), err = $("#err", view);
-  $("#have-link", view).addEventListener("click", linkView);
+  $("#have-code", view).addEventListener("click", codeView);
+  icons();
   f.addEventListener("submit", async (e) => {
     e.preventDefault(); err.hidden = true;
     const wifeName = f.elements.wife.value.trim(), husbandName = f.elements.husband.value.trim();
@@ -70,43 +73,26 @@ function setupView() {
   });
 }
 
-/* ---------- After setup: send the link to the partner ---------- */
+/* ---------- After setup: connect the partner's phone with a code ---------- */
 function shareView() {
-  view.innerHTML = `<div class="card" style="padding:16px;text-align:center">
+  view.innerHTML = `<div class="card" style="padding:16px">
       <div class="empty" style="padding:4px 0 0"><div class="ico" style="background:var(--sage-soft);color:var(--sage);border:0"><i data-lucide="check"></i></div>
-      <strong>Oila tayyor!</strong><p>Endi juftingizga oila havolasini yuboring. U havolani o'z telefonida bir marta ochadi — shu bilan tamom.</p></div>
-      <button class="btn accent block" id="share"><i data-lucide="send"></i>Havolani yuborish</button>
-      <p class="hint" style="margin:10px 0 0">Havolani faqat juftingizga bering — u oilangiz sahifasining kaliti.</p>
+      <strong>Oila tayyor!</strong><p>Endi juftingiz telefonini ulang: u <b>«Menda kod bor»</b>ni bosib, shu kodni kiritadi.</p></div>
+      <div id="code-box"></div>
     </div>
-    <button class="btn ghost block" id="next" style="margin-top:12px">Davom etish</button>`;
-  $("#share", view).addEventListener("click", App.shareFamilyLink);
+    <button class="btn primary block" id="next" style="margin-top:12px">Davom etish</button>
+    <p class="hint" style="text-align:center;margin-top:8px">Keyinroq ham ulash mumkin: Sozlamalar → «Qurilmani ulash».</p>`;
+  App.showPairCode($("#code-box", view));
   $("#next", view).addEventListener("click", () => route());
   icons();
 }
 
-/* ---------- Second phone without the link at hand: paste it ---------- */
-function linkView() {
-  view.innerHTML = `<form id="f" novalidate>
-      <div class="field"><label for="l-link">Oila havolasi</label><input class="input" id="l-link" name="link" autocomplete="off" inputmode="url" required>
-        <span class="hint">Juftingiz yuborgan havolani shu yerga qo'ying.</span></div>
-      <p class="error-text" id="err" hidden></p>
-      <button class="btn primary block" type="submit">Ulanish</button>
-    </form>
+/* ---------- Second phone: enter the partner's code ---------- */
+function codeView() {
+  view.innerHTML = `<div id="code-form"></div>
     <button class="link-btn" id="back" style="display:block;margin:16px auto 0">Yangi oila boshlash</button>`;
-  const f = $("#f", view), err = $("#err", view);
+  App.enterPairCode({ inline: $("#code-form", view), onJoined: () => route() });
   $("#back", view).addEventListener("click", setupView);
-  f.addEventListener("submit", async (e) => {
-    e.preventDefault(); err.hidden = true;
-    const raw = f.elements.link.value.trim();
-    const key = (raw.match(/#k=([\w-]+)/) || [])[1] || raw;
-    if (!key) { err.textContent = "Havolani qo'ying."; err.hidden = false; return; }
-    const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
-    try {
-      if (await Store.joinFamily(key)) return route();
-      err.textContent = "Bu havola bilan oila topilmadi. Juftingizdan havolani qayta so'rang.";
-    } catch (ex) { console.error(ex); err.textContent = OFFLINE; }
-    err.hidden = false; btn.disabled = false;
-  });
 }
 
 /* ---------- Each phone, once: who is holding it? ---------- */
