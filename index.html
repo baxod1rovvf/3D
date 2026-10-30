@@ -4,13 +4,13 @@
 <title>Oila Uchun</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F4EEE6">
+<meta name="theme-color" content="#FFF8EC">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 <script src="js/config.js"></script>
@@ -20,28 +20,29 @@
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 <style>
-  .hello { margin-top: 6px; }
-  .hello h1 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.15; letter-spacing: -.015em; }
-  .hello p { margin: 6px 0 0; color: var(--muted); }
-  .overview { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .ov { padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 120px; transition: transform var(--t-fast); }
-  .ov:active { transform: scale(.98); }
-  .ov .ov-ico { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; }
-  .ov .ov-ico svg { width: 18px; height: 18px; }
-  .ov .num { font-family: var(--serif); font-size: 28px; font-weight: 500; line-height: 1; }
-  .ov .lbl { font-size: 13px; color: var(--ink-2); }
-  .ov .val { font-weight: 600; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
-  .ov.wide { grid-column: span 2; min-height: 0; flex-direction: row; align-items: center; }
-  .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .qa { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 12px 4px; font-size: 12px; font-weight: 500; text-align: center; color: var(--ink-2); line-height: 1.2; }
-  .qa span.i { width: 48px; height: 48px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink); box-shadow: var(--shadow); transition: transform var(--t-fast); }
-  .qa:active span.i { transform: scale(.93); }
-  .qa svg { width: 21px; height: 21px; }
+  .hello { margin-top: 2px; }
+  .hello h1 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 29px; line-height: 1.15; }
+  .hello p { margin: 4px 0 0; color: var(--ink-2); font-weight: 700; }
+  .overview { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ov { padding: 14px; display: flex; flex-direction: column; gap: 8px; min-height: 128px; background: var(--accent-soft); border-color: transparent; box-shadow: 0 4px 0 var(--accent); transition: transform var(--t-fast) var(--bounce); }
+  .ov:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--accent); }
+  .ov .ov-ico { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex: none; background: #fff; font-size: 22px; line-height: 1; box-shadow: 0 2px 0 rgba(43, 36, 64, .08); }
+  .ov .num { font-family: var(--display); font-size: 34px; font-weight: 600; line-height: 1; color: var(--ink); }
+  .ov .lbl { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+  .ov .val { font-family: var(--display); font-weight: 600; font-size: 17px; line-height: 1.25; overflow-wrap: anywhere; }
+  .ov.wide { grid-column: span 2; min-height: 0; flex-direction: row; align-items: center; gap: 12px; }
+  .ov .go { width: 20px; height: 20px; color: var(--accent-ink); flex: none; }
+  .actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .qa { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 8px 2px; font-size: 12px; font-weight: 800; text-align: center; color: var(--ink-2); line-height: 1.2; min-height: 44px; }
+  .qa span.i { width: 56px; height: 56px; border-radius: 20px; background: var(--accent-soft); border: 2px solid #fff; display: grid; place-items: center; font-size: 26px; line-height: 1; box-shadow: 0 0 0 2px var(--accent), 0 4px 0 2px var(--accent); transition: transform var(--t-fast) var(--bounce); }
+  .qa:active span.i { transform: scale(.9) rotate(-6deg); }
+  .act { gap: 10px; }
   .act .who { flex: none; }
+  .act .sticker { margin: -4px 0; }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" data-section="home">
   <main class="main" id="main">
     <div class="hello">
       <h1 id="greet">&nbsp;</h1>
@@ -49,7 +50,7 @@
     </div>
 
     <section class="section" aria-labelledby="ov-h">
-      <div class="section-head"><h2 id="ov-h">Bugun</h2></div>
+      <div class="section-head"><h2 id="ov-h">Bugun <span class="emo" aria-hidden="true">☀️</span></h2></div>
       <div class="overview" id="overview">
         <div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:120px"></div>
         <div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:120px"></div>
@@ -57,17 +58,17 @@
     </section>
 
     <section class="section" aria-labelledby="qa-h">
-      <div class="section-head"><h2 id="qa-h">Tezkor amallar</h2></div>
+      <div class="section-head"><h2 id="qa-h">Tezkor amallar <span class="emo" aria-hidden="true">⚡</span></h2></div>
       <div class="actions">
-        <a class="qa" href="rozgor.html?new=1"><span class="i"><i data-lucide="shopping-basket"></i></span>Mahsulot qo'shish</a>
-        <a class="qa" href="taomlar.html?new=1"><span class="i"><i data-lucide="utensils"></i></span>Taom qo'shish</a>
-        <a class="qa" href="uy-ishlari.html?new=1"><span class="i"><i data-lucide="list-plus"></i></span>Ish qo'shish</a>
-        <a class="qa" href="xotiralar.html?new=1"><span class="i"><i data-lucide="camera"></i></span>Xotira saqlash</a>
+        <a class="qa" data-section="rozgor" href="rozgor.html?new=1"><span class="i emo" aria-hidden="true">🛒</span>Mahsulot qo'shish</a>
+        <a class="qa" data-section="taomlar" href="taomlar.html?new=1"><span class="i emo" aria-hidden="true">🍲</span>Taom qo'shish</a>
+        <a class="qa" data-section="uy-ishlari" href="uy-ishlari.html?new=1"><span class="i emo" aria-hidden="true">🧹</span>Ish qo'shish</a>
+        <a class="qa" data-section="xotiralar" href="xotiralar.html?new=1"><span class="i emo" aria-hidden="true">📸</span>Xotira saqlash</a>
       </div>
     </section>
 
     <section class="section" aria-labelledby="act-h">
-      <div class="section-head"><h2 id="act-h">So'nggi faollik</h2></div>
+      <div class="section-head"><h2 id="act-h">So'nggi faollik <span class="emo" aria-hidden="true">💬</span></h2></div>
       <div class="card list" id="activity"></div>
     </section>
   </main>
@@ -77,7 +78,7 @@
 const { $, esc, icons } = App;
 
 async function render(ctx) {
-  $("#greet").textContent = `${App.greeting()}, ${App.firstName(ctx.profile)}`;
+  $("#greet").textContent = `${App.greeting()}, ${App.firstName(ctx.profile)} 👋`;
   $("#today").textContent = App.fmtLong(new Date());
 
   const [items, meals, tasks, acts] = await Promise.all([
@@ -100,41 +101,47 @@ async function render(ctx) {
     .sort((a, b) => (a.remind_at || a.due_date) > (b.remind_at || b.due_date) ? 1 : -1);
 
   $("#overview").innerHTML = `
-    <a class="card ov" href="rozgor.html">
-      <span class="ov-ico" style="background:var(--accent-soft);color:var(--accent)"><i data-lucide="shopping-basket"></i></span>
+    <a class="card ov" data-section="rozgor" href="rozgor.html">
+      <span class="ov-ico emo" aria-hidden="true">🛒</span>
       <span class="num">${need.length}</span>
-      <span class="lbl">ta mahsulot kerak${urgent ? ` · <b style="color:var(--danger)">${urgent} shoshilinch</b>` : ""}</span>
+      <span class="lbl">ta mahsulot kerak${urgent ? ` · <b style="color:var(--danger-ink)">${urgent} shoshilinch</b>` : ""}</span>
     </a>
-    <a class="card ov" href="uy-ishlari.html">
-      <span class="ov-ico" style="background:var(--sage-soft);color:var(--sage)"><i data-lucide="sparkles"></i></span>
+    <a class="card ov" data-section="uy-ishlari" href="uy-ishlari.html">
+      <span class="ov-ico emo" aria-hidden="true">🧹</span>
       <span class="num">${pending.length}</span>
       <span class="lbl">ta uy ishi kutmoqda${mine ? ` · ${mine} tasi sizda` : ""}</span>
     </a>
-    <a class="card ov wide" href="taomlar.html">
-      <span class="ov-ico" style="background:var(--honey-soft);color:#8E6520"><i data-lucide="utensils"></i></span>
+    <a class="card ov wide" data-section="taomlar" href="taomlar.html">
+      <span class="ov-ico emo" aria-hidden="true">${meal ? { nonushta: "🍳", tushlik: "🍲", kechki: "🌙" }[meal.slot] || "🍲" : "🍽️"}</span>
       <span class="grow" style="flex:1;min-width:0">
         <span class="lbl">${meal ? slotName[meal.slot] : "Bugungi taom"}</span><br>
         <span class="val">${meal ? esc(meal.title) : "Hali rejalashtirilmagan"}</span>
       </span>
-      <i data-lucide="chevron-right" style="color:var(--muted)"></i>
+      <i data-lucide="chevron-right" class="go"></i>
     </a>
-    <a class="card ov wide" href="uy-ishlari.html">
-      <span class="ov-ico" style="background:#E6ECF1;color:var(--him)"><i data-lucide="alarm-clock"></i></span>
+    <a class="card ov wide" data-section="home" href="uy-ishlari.html">
+      <span class="ov-ico emo" aria-hidden="true">⏰</span>
       <span class="grow" style="flex:1;min-width:0">
         <span class="lbl">Yaqin eslatmalar</span><br>
         <span class="val">${reminders.length ? esc(reminders[0].title) + ` <span class="muted small" style="font-weight:400">· ${App.fmtShort(reminders[0].remind_at ? App.ymd(new Date(reminders[0].remind_at)) : reminders[0].due_date)}</span>` : "Eslatma yo'q"}</span>
         ${reminders.length > 1 ? `<span class="small muted">yana ${reminders.length - 1} ta</span>` : ""}
       </span>
-      <i data-lucide="chevron-right" style="color:var(--muted)"></i>
+      <i data-lucide="chevron-right" class="go"></i>
     </a>`;
 
   const ICON = { grocery: "shopping-basket", meals: "utensils", memories: "heart", tasks: "sparkles" };
+  // A grocery activity names its product in «…»: show that product's sticker.
+  const productSticker = (a) => {
+    const m = a.module === "grocery" && /«([^»]+)»/.exec(a.text || "");
+    return m ? `<span class="sticker sm" data-section="rozgor" aria-hidden="true">${Stickers.forName(m[1], "boshqa")}</span>` : "";
+  };
   $("#activity").innerHTML = acts.length ? acts.map((a) => `
     <div class="row act">
       <span class="who">${App.avatar(App.person(a.actor_id), "sm")}</span>
-      <div class="grow"><div style="font-size:14px">${esc(a.text)}</div><div class="meta"><i data-lucide="${ICON[a.module] || "dot"}" style="width:12px;height:12px"></i>${App.timeAgo(a.created_at)}</div></div>
+      <div class="grow"><div style="font-size:14px;font-weight:600">${esc(a.text)}</div><div class="meta"><i data-lucide="${ICON[a.module] || "dot"}" style="width:12px;height:12px"></i>${App.timeAgo(a.created_at)}</div></div>
+      ${productSticker(a)}
     </div>`).join("")
-    : `<div class="empty"><div class="ico"><i data-lucide="home"></i></div><strong>Uyingiz endi jonlanadi</strong><p>Birinchi mahsulot yoki ishni qo'shing — juftingiz darhol ko'radi.</p><a class="btn ghost" href="rozgor.html?new=1">Mahsulot qo'shish</a></div>`;
+    : `<div class="empty"><div class="ico emo" aria-hidden="true">🏡</div><strong>Uyingiz endi jonlanadi</strong><p>Birinchi mahsulot yoki ishni qo'shing — juftingiz darhol ko'radi.</p><a class="btn primary" href="rozgor.html?new=1">Mahsulot qo'shish <span class="emo" aria-hidden="true">🛍️</span></a></div>`;
   icons();
 }
 

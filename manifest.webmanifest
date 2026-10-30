@@ -3,7 +3,7 @@
   "short_name": "Oila Uchun",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#F4EEE6",
-  "theme_color": "#F4EEE6",
+  "background_color": "#FFF8EC",
+  "theme_color": "#FFF8EC",
   "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

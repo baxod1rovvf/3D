@@ -4,13 +4,13 @@
 <title>Xush kelibsiz — Oila Uchun</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F4EEE6">
+<meta name="theme-color" content="#FFF8EC">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 <script src="js/config.js"></script>
@@ -21,25 +21,37 @@
 <script src="js/app.js"></script>
 <style>
   .auth { flex: 1; overflow-y: auto; padding: calc(40px + var(--safe-t)) 22px 28px; display: flex; flex-direction: column; animation: page-in var(--t) var(--ease) both; }
+  .auth { background: radial-gradient(120% 50% at 50% 0%, var(--accent-soft) 0 55%, transparent 56%); }
   .brand { text-align: center; margin-bottom: 26px; }
-  .brand svg { width: 64px; height: 64px; margin: 0 auto 14px; }
-  .brand h1 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 32px; letter-spacing: -.01em; }
-  .brand p { margin: 6px 0 0; color: var(--muted); }
+  .brand svg { width: 76px; height: 76px; margin: 0 auto 14px; display: block; filter: drop-shadow(0 5px 0 rgba(43, 36, 64, .12)); }
+  .brand h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 36px; line-height: 1.1; }
+  .brand h1 .c1 { color: #13774A; } .brand h1 .c2 { color: #B8204F; }
+  .brand p { margin: 6px 0 0; color: var(--ink-2); font-weight: 700; }
+  .brand .stickers { display: flex; justify-content: center; gap: 8px; margin-top: 12px; font-size: 22px; }
+  .brand .stickers span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #fff; box-shadow: 0 3px 0 rgba(43, 36, 64, .08); }
+  @media (prefers-reduced-motion: no-preference) {
+    .brand .stickers span { animation: bob 2.6s ease-in-out infinite; }
+    .brand .stickers span:nth-child(2) { animation-delay: .2s; } .brand .stickers span:nth-child(3) { animation-delay: .4s; }
+    .brand .stickers span:nth-child(4) { animation-delay: .6s; } .brand .stickers span:nth-child(5) { animation-delay: .8s; }
+  }
   .who { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .who button { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 10px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); font-weight: 600; transition: transform var(--t-fast); }
-  .who button:active { transform: scale(.97); }
-  .who .avatar { width: 56px; height: 56px; font-size: 22px; }
-  .foot-note { margin-top: auto; padding-top: 24px; text-align: center; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .who button { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 10px; border-radius: var(--r-lg); border: 2px solid var(--line); background: var(--surface); box-shadow: 0 4px 0 var(--line-2); font-family: var(--display); font-size: 18px; font-weight: 600; transition: transform var(--t-fast) var(--bounce); }
+  .who button:first-child { background: #FFE2EA; border-color: transparent; box-shadow: 0 4px 0 #FF5C8A; }
+  .who button:last-child:not(:first-child) { background: #E8E6FF; border-color: transparent; box-shadow: 0 4px 0 #6C63FF; }
+  .who button:active { transform: scale(.96); }
+  .who .avatar { width: 60px; height: 60px; font-size: 24px; border-width: 3px; }
+  .foot-note { margin-top: auto; padding-top: 24px; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px; }
   .foot-note svg { width: 14px; height: 14px; }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" data-section="home">
   <div class="auth">
     <div class="brand">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="18" fill="#2F2A25"/><path d="M14 36c4 9 12 14 18 14s14-5 18-14" fill="none" stroke="#E8C9A8" stroke-width="3.2" stroke-linecap="round"/><path d="M17 40c5 4 10 5 15 5s10-1 15-5" fill="none" stroke="#B8664A" stroke-width="3.2" stroke-linecap="round"/><circle cx="27" cy="31" r="5.5" fill="#FFF3E6"/><circle cx="37.5" cy="30" r="6.5" fill="#F3DCC4"/></svg>
-      <h1>Oila Uchun</h1>
-      <p>Ikkingiz uchun bitta raqamli uy</p>
+      <span id="logo"></span>
+      <h1><span class="c1">Oila</span> <span class="c2">Uchun</span></h1>
+      <p>Ikkingiz uchun bitta raqamli uy <span class="emo" aria-hidden="true">🏡</span></p>
+      <div class="stickers emo" aria-hidden="true"><span>🛒</span><span>🍲</span><span>💞</span><span>🧹</span><span>🥕</span></div>
     </div>
     <div id="view"></div>
     <div class="foot-note"><i data-lucide="lock"></i>Ma'lumotlaringizni faqat ikkingiz ko'rasiz</div>
@@ -49,6 +61,7 @@
 <script>
 const { $, $$, esc, icons } = App;
 const view = $("#view");
+$("#logo").innerHTML = App.logoMark(76);
 const OFFLINE = "Ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.";
 
 /* ---------- First phone: set up the family ---------- */
@@ -58,7 +71,7 @@ function setupView() {
       <div class="field"><label for="h-name">Erning ismi</label><input class="input" id="h-name" name="husband" autocomplete="off" maxlength="30" required></div>
       <div class="field"><label for="f-name">Oila nomi</label><input class="input" id="f-name" name="family" value="Bizning uy" maxlength="40"></div>
       <p class="error-text" id="err" hidden></p>
-      <button class="btn primary block" type="submit">Oilani boshlash</button>
+      <button class="btn primary block" type="submit">Oilani boshlash <span class="emo" aria-hidden="true">🚀</span></button>
     </form>
     <div style="display:flex;align-items:center;gap:10px;margin:18px 0 12px;color:var(--muted);font-size:13px"><span style="flex:1;height:1px;background:var(--line)"></span>yoki<span style="flex:1;height:1px;background:var(--line)"></span></div>
     <button class="btn ghost block" id="have-code"><i data-lucide="keyboard"></i>Menda kod bor</button>
@@ -79,11 +92,11 @@ function setupView() {
 /* ---------- After setup: connect the partner's phone with a code ---------- */
 function shareView() {
   view.innerHTML = `<div class="card" style="padding:16px">
-      <div class="empty" style="padding:4px 0 0"><div class="ico" style="background:var(--sage-soft);color:var(--sage);border:0"><i data-lucide="check"></i></div>
+      <div class="empty" style="padding:4px 0 0"><div class="ico emo" aria-hidden="true">🎉</div>
       <strong>Oila tayyor!</strong><p>Endi juftingiz telefonini ulang: u <b>«Menda kod bor»</b>ni bosib, shu kodni kiritadi.</p></div>
       <div id="code-box"></div>
     </div>
-    <button class="btn primary block" id="next" style="margin-top:12px">Davom etish</button>
+    <button class="btn primary block" id="next" style="margin-top:12px">Davom etish <span class="emo" aria-hidden="true">👉</span></button>
     <p class="hint" style="text-align:center;margin-top:8px">Keyinroq ham ulash mumkin: Sozlamalar → «Qurilmani ulash».</p>`;
   App.showPairCode($("#code-box", view));
   $("#next", view).addEventListener("click", () => route());
@@ -101,7 +114,7 @@ function codeView() {
 /* ---------- Each phone, once: who is holding it? ---------- */
 function whoView(ctx) {
   const members = [...ctx.members].sort((a, b) => (a.role === "xotin" ? -1 : b.role === "xotin" ? 1 : 0));
-  view.innerHTML = `<p style="text-align:center;margin:0 0 14px"><b>${esc(ctx.household.name)}</b> — bu telefon kimniki?</p>
+  view.innerHTML = `<p style="text-align:center;margin:0 0 14px"><b>${esc(ctx.household.name)}</b> — bu telefon kimniki? <span class="emo" aria-hidden="true">📱</span></p>
     <div class="who">${members.map((m) => `<button data-id="${m.id}">${App.avatar(m)}${esc(m.full_name)}<span class="small muted" style="font-weight:400">${m.role === "er" ? "Er" : "Xotin"}</span></button>`).join("")}</div>
     <p class="hint" style="text-align:center;margin-top:18px">Telefon buni eslab qoladi — keyin bu savol berilmaydi.</p>
     ${Store.mode === "demo" ? `<p class="hint" style="text-align:center">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefonni ulash uchun js/config.js ga Supabase manzili va kalitini yozing.</p>` : ""}`;
@@ -115,13 +128,13 @@ async function route() {
   let ctx = null;
   try {
     if (fromLink && !(await Store.joinFamily(fromLink))) {
-      view.innerHTML = `<div class="empty"><div class="ico"><i data-lucide="link-2-off"></i></div><strong>Havola ishlamadi</strong><p>Bu havola bilan oila topilmadi. Juftingizdan havolani qayta so'rang.</p><button class="btn ghost" onclick="setupView()">Bosh sahifa</button></div>`;
+      view.innerHTML = `<div class="empty"><div class="ico emo" aria-hidden="true">🔗</div><strong>Havola ishlamadi</strong><p>Bu havola bilan oila topilmadi. Juftingizdan havolani qayta so'rang.</p><button class="btn ghost" onclick="setupView()">Bosh sahifa</button></div>`;
       return icons();
     }
     ctx = await Store.session();
   } catch (e) {
     console.error(e);
-    view.innerHTML = `<div class="empty"><div class="ico"><i data-lucide="wifi-off"></i></div><strong>Ulanib bo'lmadi</strong><p>Internetni tekshirib, qayta urinib ko'ring.</p><button class="btn primary" onclick="location.reload()">Qayta urinish</button></div>`;
+    view.innerHTML = `<div class="empty"><div class="ico emo" aria-hidden="true">📡</div><strong>Ulanib bo'lmadi</strong><p>Internetni tekshirib, qayta urinib ko'ring.</p><button class="btn primary" onclick="location.reload()">Qayta urinish</button></div>`;
     return icons();
   }
   if (!ctx) setupView();

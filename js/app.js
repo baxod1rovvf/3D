@@ -1,11 +1,11 @@
 /* Oila Uchun — shared shell: auth guard, top bar, bottom tabs, sheets, toasts, notifications. */
 (function () {
   const TABS = [
-    { href: "index.html", id: "home", icon: "house", label: "Bosh sahifa" },
-    { href: "rozgor.html", id: "rozgor", icon: "shopping-basket", label: "Ro'zg'or" },
-    { href: "taomlar.html", id: "taomlar", icon: "utensils", label: "Taomlar" },
-    { href: "xotiralar.html", id: "xotiralar", icon: "heart", label: "Xotiralar" },
-    { href: "uy-ishlari.html", id: "uy", icon: "sparkles", label: "Uy ishlari" },
+    { href: "index.html", id: "home", section: "home", icon: "house", label: "Bosh sahifa" },
+    { href: "rozgor.html", id: "rozgor", section: "rozgor", icon: "shopping-basket", label: "Ro'zg'or" },
+    { href: "taomlar.html", id: "taomlar", section: "taomlar", icon: "utensils", label: "Taomlar" },
+    { href: "xotiralar.html", id: "xotiralar", section: "xotiralar", icon: "heart", label: "Xotiralar" },
+    { href: "uy-ishlari.html", id: "uy", section: "uy-ishlari", icon: "sparkles", label: "Uy ishlari" },
   ];
   const MODULE_ICON = { grocery: "shopping-basket", meals: "utensils", memories: "heart", tasks: "sparkles" };
 
@@ -185,7 +185,7 @@
   }
 
   /* ---------- shell rendering ---------- */
-  function topbar({ title, sub, home }) {
+  function topbar({ title, sub, home, emoji }) {
     const c = Store.ctx;
     const people = [c.profile, c.partner].filter(Boolean).map((p) => avatar(p)).join("");
     if (home) {
@@ -198,7 +198,7 @@
       </header>`;
     }
     return `<header class="topbar">
-      <h1>${esc(title)}${sub ? `<span class="sub">${esc(sub)}</span>` : ""}</h1>
+      <h1>${esc(title)}${emoji ? ` <span class="emo" aria-hidden="true">${esc(emoji)}</span>` : ""}${sub ? `<span class="sub">${esc(sub)}</span>` : ""}</h1>
       <button class="icon-btn" id="bell" aria-label="Bildirishnomalar"><i data-lucide="bell"></i><span class="dot" hidden></span></button>
         <button class="icon-btn" id="settings-btn" aria-label="Sozlamalar"><i data-lucide="settings"></i></button>
       <button class="avatars" id="me-btn" aria-label="Sozlamalar" style="border:0;background:none;padding:0">${people}</button>
@@ -206,15 +206,19 @@
   }
   function logoSvg() {
     return `<span style="display:flex;align-items:center;gap:9px">
-      <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="18" fill="#2F2A25"/>
-        <path d="M14 36c4 9 12 14 18 14s14-5 18-14" fill="none" stroke="#E8C9A8" stroke-width="3.2" stroke-linecap="round"/>
-        <path d="M17 40c5 4 10 5 15 5s10-1 15-5" fill="none" stroke="#B8664A" stroke-width="3.2" stroke-linecap="round"/>
-        <circle cx="27" cy="31" r="5.5" fill="#FFF3E6"/><circle cx="37.5" cy="30" r="6.5" fill="#F3DCC4"/></svg>
-      <span style="line-height:1.05"><span class="serif" style="font-size:19px;font-weight:600;letter-spacing:.08em">NEST</span><br><span style="font-size:11.5px;color:var(--muted)">Oila Uchun</span></span></span>`;
+      ${logoMark(38)}
+      <span style="line-height:1.05"><span class="logo-word">NEST</span><br><span class="logo-sub">Oila Uchun</span></span></span>`;
+  }
+  /** The playful app mark: a sunny tile with two smiling faces under one roof. */
+  function logoMark(size) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="20" fill="#FFB703"/>
+        <path d="M12 30 32 13l20 17" fill="none" stroke="#2B2440" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="24" cy="38" r="9" fill="#FF5C8A"/><circle cx="41" cy="37" r="10" fill="#6C63FF"/>
+        <path d="M20.5 40.5c2 2 5 2 7 0M37 40c2.4 2.4 5.6 2.4 8 0" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
   }
   function tabbar(active) {
     return `<nav class="tabbar" aria-label="Asosiy bo'limlar">${TABS.map((t) => `
-      <a class="tab ${t.id === active ? "active" : ""}" href="${t.href}" ${t.id === active ? 'aria-current="page"' : ""}>
+      <a class="tab ${t.id === active ? "active" : ""}" data-section="${t.section}" href="${t.href}" ${t.id === active ? 'aria-current="page"' : ""}>
         <span class="pill"><i data-lucide="${t.icon}"></i></span><span>${t.label}</span></a>`).join("")}</nav>`;
   }
 
@@ -337,6 +341,8 @@
     Store.ctx = ctx;
 
     const app = $(".app");
+    const tab = TABS.find((t) => t.id === opts.page);
+    if (!app.dataset.section && tab) app.dataset.section = tab.section;
     app.insertAdjacentHTML("afterbegin", topbar(opts));
     if (Store.mode === "demo") {
       $(".topbar").insertAdjacentHTML("afterend", `<div class="demo-banner"><i data-lucide="flask-conical"></i><span>Demo: siz <b>${esc(firstName(ctx.profile))}</b></span><button id="demo-switch">${esc(firstName(ctx.partner))} bo'lish</button></div>`);
@@ -371,6 +377,6 @@
     boot, sheet, showPairCode, enterPairCode, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
     person, nameOf, firstName, isMe, avatar, timeAgo, greeting,
     ymd, parseYmd, today, addDays, fmtLong, fmtDate, fmtShort,
-    MONTHS, WEEKDAYS, WEEKDAYS_SHORT, logoSvg,
+    MONTHS, WEEKDAYS, WEEKDAYS_SHORT, logoSvg, logoMark,
   };
 })();

@@ -4,13 +4,13 @@
 <title>Uy ishlari — Oila Uchun</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F4EEE6">
+<meta name="theme-color" content="#FFF8EC">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 <script src="js/config.js"></script>
@@ -20,41 +20,44 @@
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 <style>
-  .filters { display: flex; gap: 6px; margin: 12px 0 2px; }
-  .filters button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: var(--ink-2); min-height: 36px; transition: all var(--t-fast); }
-  .filters button.active { background: var(--ink); border-color: var(--ink); color: #FFF8EF; }
+  .filters { display: flex; gap: 8px; margin: 12px 0 2px; }
+  .filters button { border: 2px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 6px 16px; font-size: 14px; font-weight: 800; color: var(--ink-2); min-height: 44px; transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast) var(--bounce); }
+  .filters button:active { transform: scale(.94); }
+  .filters button.active { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); box-shadow: 0 3px 0 var(--accent-deep); }
 
   .task { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; margin-top: 10px; transition: opacity var(--t), transform var(--t); }
   .task .grow { flex: 1; min-width: 0; cursor: pointer; }
-  .task h4 { margin: 2px 0 0; font-size: 15.5px; font-weight: 600; overflow-wrap: anywhere; }
-  .task .desc { margin: 2px 0 0; font-size: 13.5px; color: var(--ink-2); }
-  .task .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .task h4 { margin: 2px 0 0; font-family: var(--display); font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+  .task .desc { margin: 2px 0 0; font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+  .task .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
   .task .who { display: inline-flex; align-items: center; gap: 5px; }
-  .task.prio-yuqori { box-shadow: inset 3px 0 0 var(--danger), var(--shadow); }
-  .task.prio-orta { box-shadow: inset 3px 0 0 var(--honey), var(--shadow); }
+  .task.prio-yuqori { box-shadow: inset 5px 0 0 var(--danger), var(--shadow); }
+  .task.prio-orta { box-shadow: inset 5px 0 0 var(--honey), var(--shadow); }
   .task.done h4 { text-decoration: line-through; color: var(--muted); }
   .task.done { background: var(--surface-2); box-shadow: none; }
 
   .check { width: 48px; height: 48px; margin: -9px -6px -9px -10px; border: 0; background: none; display: grid; place-items: center; flex: none; position: relative; }
-  .check .c { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line-2); display: grid; place-items: center; color: transparent; background: #fff; transition: all var(--t) var(--ease); }
+  .check .c { width: 32px; height: 32px; border-radius: 50%; border: 2.5px solid var(--accent); display: grid; place-items: center; color: transparent; background: #fff; transition: all var(--t) var(--ease); }
   .check .c svg { width: 16px; height: 16px; stroke-width: 3; }
   .check:active .c { transform: scale(.88); }
-  .check.on .c { background: var(--sage); border-color: var(--sage); color: #fff; }
-  .check.anim .c { animation: pop 380ms var(--ease); }
-  .burst { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; pointer-events: none; animation: burst 600ms var(--ease) forwards; }
-  @keyframes burst { from { transform: translate(0, 0) scale(1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) scale(.3); opacity: 0; } }
-  @keyframes pop { 0% { transform: scale(.7); } 55% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  .check.on .c { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
+  .check.anim .c { animation: pop 380ms var(--bounce); }
+  /* Colorful confetti on completion (only spawned when motion is allowed) */
+  .burst { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 2px; pointer-events: none; z-index: 2; animation: burst 750ms var(--ease) forwards; }
+  .burst.round { border-radius: 50%; }
+  @keyframes burst { from { transform: translate(0, 0) rotate(0) scale(1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(.4); opacity: 0; } }
   .leaving { animation: leave 420ms 520ms var(--ease) forwards; }
   @keyframes leave { to { opacity: 0; transform: translateY(-6px) scale(.98); } }
 
-  .group-h { margin: 18px 2px 0; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
-  .progress { margin-top: 14px; padding: 14px; display: flex; align-items: center; gap: 14px; }
-  .progress .ring { width: 48px; height: 48px; flex: none; }
-  .progress b { font-family: var(--serif); font-size: 18px; font-weight: 500; }
+  .group-h { margin: 20px 2px 0; font-family: var(--display); font-size: 17px; font-weight: 600; color: var(--ink); }
+  .progress { margin-top: 14px; padding: 14px; display: flex; align-items: center; gap: 14px; background: var(--accent-soft); border-color: transparent; box-shadow: 0 4px 0 var(--accent); }
+  .progress .ring { width: 52px; height: 52px; flex: none; }
+  .progress b { font-family: var(--display); font-size: 21px; font-weight: 600; }
+  .progress .small { color: var(--ink-2); font-weight: 700; }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" data-section="uy-ishlari">
   <main class="main" id="main">
     <div class="segmented" role="tablist" aria-label="Ishlar">
       <button role="tab" data-view="today">Bugun <span class="count" id="c-today">0</span></button>
@@ -99,18 +102,18 @@ function draw() {
     const total = today.length + doneToday;
     if (total) {
       const pct = total ? doneToday / total : 0;
-      html += `<div class="card progress"><svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--line)" stroke-width="5"/><circle cx="24" cy="24" r="20" fill="none" stroke="var(--sage)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(125.7 * pct).toFixed(1)} 200" transform="rotate(-90 24 24)" style="transition:stroke-dasharray .5s"/></svg>
-        <div><b>${doneToday} / ${total}</b><div class="small muted">${pct === 1 ? "Bugungi ishlar tugadi. Rahmat!" : "bugungi ish bajarildi"}</div></div></div>`;
+      html += `<div class="card progress"><svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="#fff" stroke-width="6"/><circle cx="24" cy="24" r="20" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(125.7 * pct).toFixed(1)} 200" transform="rotate(-90 24 24)" style="transition:stroke-dasharray .5s"/></svg>
+        <div><b>${doneToday} / ${total} ${pct === 1 ? "🎉" : pct >= .5 ? "💪" : "🚀"}</b><div class="small">${pct === 1 ? "Bugungi ishlar tugadi. Rahmat!" : "bugungi ish bajarildi"}</div></div></div>`;
     }
     const list = today.filter(byWho).sort(sort);
-    html += list.length ? list.map(card).join("") : empty(today.length ? "Bu filtrda ish yo'q" : "Bugun bo'sh kun", today.length ? "Boshqa filtrni tanlang." : "Yangi ish qo'shing yoki dam oling.");
+    html += list.length ? list.map(card).join("") : empty(today.length ? "Bu filtrda ish yo'q" : "Bugun bo'sh kun 🌤️", today.length ? "Boshqa filtrni tanlang." : "Yangi ish qo'shing yoki dam oling.", today.length ? "🔍" : "🧘");
   } else if (view === "upcoming") {
     const list = upcoming.filter(byWho).sort(sort);
     let last = null;
-    html += list.length ? list.map((x) => { const h = x.due_date !== last ? `<div class="group-h">${App.fmtShort(x.due_date)}</div>` : ""; last = x.due_date; return h + card(x); }).join("") : empty("Kelgusi ishlar yo'q", "Kelgusi kunlar uchun ish rejalashtiring.");
+    html += list.length ? list.map((x) => { const h = x.due_date !== last ? `<div class="group-h">${App.fmtShort(x.due_date)}</div>` : ""; last = x.due_date; return h + card(x); }).join("") : empty("Kelgusi ishlar yo'q", "Kelgusi kunlar uchun ish rejalashtiring.", "🗓️");
   } else {
     const list = done.filter(byWho).slice(0, 60);
-    html += list.length ? list.map(card).join("") : empty("Hali bajarilgan ish yo'q", "Ishni tugatganingizda doirachani bosing.");
+    html += list.length ? list.map(card).join("") : empty("Hali bajarilgan ish yo'q", "Ishni tugatganingizda doirachani bosing.", "🏁");
   }
   $("#list").innerHTML = html;
   icons();
@@ -137,19 +140,20 @@ function card(x) {
   </div>`;
 }
 
-function empty(title, text) {
-  return `<div class="empty" style="margin-top:24px"><div class="ico"><i data-lucide="sparkles"></i></div><strong>${title}</strong><p>${text}</p>
-    <button class="btn primary" onclick="openEditor()"><i data-lucide="plus"></i>Ish qo'shish</button></div>`;
+function empty(title, text, emoji = "🧹") {
+  return `<div class="empty" style="margin-top:24px"><div class="ico emo" aria-hidden="true">${emoji}</div><strong>${title}</strong><p>${text}</p>
+    <button class="btn primary" onclick="openEditor()">Ish qo'shish <span class="emo" aria-hidden="true">✨</span></button></div>`;
 }
 
 function burst(btn) {
-  const colors = ["#6F8466", "#C9963E", "#B8664A", "#6E8A9C"];
-  for (let i = 0; i < 10; i++) {
+  const colors = ["#FFB703", "#2BB673", "#FF6B3D", "#FF5C8A", "#6C63FF"];
+  for (let i = 0; i < 16; i++) {
     const s = document.createElement("span");
-    const a = (Math.PI * 2 * i) / 10, r = 22 + Math.random() * 10;
-    s.className = "burst"; s.style.background = colors[i % 4];
+    const a = (Math.PI * 2 * i) / 16 + Math.random() * .3, r = 26 + Math.random() * 18;
+    s.className = "burst" + (i % 3 ? "" : " round"); s.style.background = colors[i % colors.length];
     s.style.setProperty("--dx", `${Math.cos(a) * r}px`); s.style.setProperty("--dy", `${Math.sin(a) * r}px`);
-    btn.appendChild(s); setTimeout(() => s.remove(), 650);
+    s.style.setProperty("--rot", `${Math.round(Math.random() * 540 - 270)}deg`);
+    btn.appendChild(s); setTimeout(() => s.remove(), 800);
   }
 }
 
@@ -187,7 +191,7 @@ function openEditor(task) {
   const x = task || { title: "", description: "", assignee_id: c.profile.id, due_date: view === "upcoming" ? App.addDays(App.today(), 1) : App.today(), priority: "orta", remind_at: null };
   const people = [c.profile, c.partner].filter(Boolean);
   App.sheet({
-    title: isNew ? "Yangi uy ishi" : "Ishni tahrirlash",
+    title: isNew ? "Yangi uy ishi 🧹" : "Ishni tahrirlash ✏️",
     body: `<form id="tform" novalidate>
       <div class="field"><label for="t-title">Ish nomi</label><input class="input" id="t-title" name="title" value="${esc(x.title)}" maxlength="80" autocomplete="off" ${isNew ? "autofocus" : ""}><span class="error-text" hidden id="t-err">Ish nomini yozing</span>
         ${isNew ? `<div class="hscroll" style="margin-top:4px">${SUGGEST.map((s) => `<button type="button" class="chip" data-s="${esc(s)}" style="padding:6px 10px;white-space:nowrap">${esc(s)}</button>`).join("")}</div>` : ""}</div>
@@ -200,7 +204,7 @@ function openEditor(task) {
       <div class="field"><label for="t-desc">Izoh</label><textarea class="textarea" id="t-desc" name="description" maxlength="300">${esc(x.description)}</textarea></div>
       ${!isNew && x.created_by ? `<p class="hint">${esc(App.nameOf(x.created_by))} qo'shgan · ${App.timeAgo(x.created_at)}</p>` : ""}
     </form>`,
-    foot: `${isNew ? `<button class="btn ghost" data-close>Bekor qilish</button>` : `<button class="btn danger" data-del aria-label="Ishni o'chirish"><i data-lucide="trash-2"></i></button>`}<button class="btn primary" data-save>${isNew ? "Qo'shish" : "Saqlash"}</button>`,
+    foot: `${isNew ? `<button class="btn ghost" data-close>Bekor qilish</button>` : `<button class="btn danger" data-del aria-label="Ishni o'chirish"><i data-lucide="trash-2"></i></button>`}<button class="btn primary" data-save>${isNew ? `Qo'shish <span class="emo" aria-hidden="true">✨</span>` : "Saqlash"}</button>`,
     onMount(el, api) {
       const f = $("#tform", el);
       $$("[data-s]", el).forEach((b) => b.addEventListener("click", () => { f.elements.title.value = b.dataset.s; $("#t-err", el).hidden = true; }));
@@ -239,7 +243,7 @@ $$(".segmented button").forEach((b) => b.addEventListener("click", () => { view 
 $$(".filters button").forEach((b) => b.addEventListener("click", () => { who = b.dataset.who; $$(".filters button").forEach((x) => x.classList.toggle("active", x === b)); draw(); }));
 $(".segmented button").classList.add("active");
 $("#add").addEventListener("click", () => openEditor());
-App.boot({ page: "uy", title: "Uy ishlari", sub: "Birgalikda — yengilroq", tables: ["tasks"], render }).then(() => {
+App.boot({ page: "uy", title: "Uy ishlari", emoji: "🧹", sub: "Birgalikda — yengilroq", tables: ["tasks"], render }).then(() => {
   if (Store.ctx && Store.ctx.partner) $("#f-partner").textContent = App.firstName(Store.ctx.partner) + "ga";
   if (new URLSearchParams(location.search).get("new")) openEditor();
 });
