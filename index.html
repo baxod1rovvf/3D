@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<title>Oila Uchun</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4EEE6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+<style>
+  .hello { margin-top: 6px; }
+  .hello h1 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.15; letter-spacing: -.015em; }
+  .hello p { margin: 6px 0 0; color: var(--muted); }
+  .overview { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ov { padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 120px; transition: transform var(--t-fast); }
+  .ov:active { transform: scale(.98); }
+  .ov .ov-ico { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; }
+  .ov .ov-ico svg { width: 18px; height: 18px; }
+  .ov .num { font-family: var(--serif); font-size: 28px; font-weight: 500; line-height: 1; }
+  .ov .lbl { font-size: 13px; color: var(--ink-2); }
+  .ov .val { font-weight: 600; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+  .ov.wide { grid-column: span 2; min-height: 0; flex-direction: row; align-items: center; }
+  .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .qa { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 12px 4px; font-size: 12px; font-weight: 500; text-align: center; color: var(--ink-2); line-height: 1.2; }
+  .qa span.i { width: 48px; height: 48px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink); box-shadow: var(--shadow); transition: transform var(--t-fast); }
+  .qa:active span.i { transform: scale(.93); }
+  .qa svg { width: 21px; height: 21px; }
+  .act .who { flex: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="main" id="main">
+    <div class="hello">
+      <h1 id="greet">&nbsp;</h1>
+      <p id="today">&nbsp;</p>
+    </div>
+
+    <section class="section" aria-labelledby="ov-h">
+      <div class="section-head"><h2 id="ov-h">Bugun</h2></div>
+      <div class="overview" id="overview">
+        <div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:120px"></div>
+        <div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:120px"></div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="qa-h">
+      <div class="section-head"><h2 id="qa-h">Tezkor amallar</h2></div>
+      <div class="actions">
+        <a class="qa" href="rozgor.html?new=1"><span class="i"><i data-lucide="shopping-basket"></i></span>Mahsulot qo'shish</a>
+        <a class="qa" href="taomlar.html?new=1"><span class="i"><i data-lucide="utensils"></i></span>Taom qo'shish</a>
+        <a class="qa" href="uy-ishlari.html?new=1"><span class="i"><i data-lucide="list-plus"></i></span>Ish qo'shish</a>
+        <a class="qa" href="xotiralar.html?new=1"><span class="i"><i data-lucide="camera"></i></span>Xotira saqlash</a>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="act-h">
+      <div class="section-head"><h2 id="act-h">So'nggi faollik</h2></div>
+      <div class="card list" id="activity"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const { $, esc, icons } = App;
+
+async function render(ctx) {
+  $("#greet").textContent = `${App.greeting()}, ${App.firstName(ctx.profile)}`;
+  $("#today").textContent = App.fmtLong(new Date());
+
+  const [items, meals, tasks, acts] = await Promise.all([
+    Store.list("grocery_items"), Store.list("meals"), Store.list("tasks"), Store.list("activity", { limit: 8 }),
+  ]);
+  const t = App.today();
+  const need = items.filter((i) => i.status === "kerak");
+  const urgent = need.filter((i) => i.urgent).length;
+
+  const slots = ["nonushta", "tushlik", "kechki"];
+  const slotName = { nonushta: "Nonushta", tushlik: "Tushlik", kechki: "Kechki ovqat" };
+  const h = new Date().getHours();
+  const todays = meals.filter((m) => m.day_date === t).sort((a, b) => slots.indexOf(a.slot) - slots.indexOf(b.slot));
+  const nextSlot = h < 11 ? 0 : h < 16 ? 1 : 2;
+  const meal = todays.find((m) => slots.indexOf(m.slot) >= nextSlot) || todays[todays.length - 1];
+
+  const pending = tasks.filter((x) => !x.done && x.due_date && x.due_date <= t);
+  const mine = pending.filter((x) => App.isMe(x.assignee_id)).length;
+  const reminders = tasks.filter((x) => !x.done && ((x.remind_at && new Date(x.remind_at) > new Date()) || (x.due_date && x.due_date > t && x.due_date <= App.addDays(t, 3))))
+    .sort((a, b) => (a.remind_at || a.due_date) > (b.remind_at || b.due_date) ? 1 : -1);
+
+  $("#overview").innerHTML = `
+    <a class="card ov" href="rozgor.html">
+      <span class="ov-ico" style="background:var(--accent-soft);color:var(--accent)"><i data-lucide="shopping-basket"></i></span>
+      <span class="num">${need.length}</span>
+      <span class="lbl">ta mahsulot kerak${urgent ? ` · <b style="color:var(--danger)">${urgent} shoshilinch</b>` : ""}</span>
+    </a>
+    <a class="card ov" href="uy-ishlari.html">
+      <span class="ov-ico" style="background:var(--sage-soft);color:var(--sage)"><i data-lucide="sparkles"></i></span>
+      <span class="num">${pending.length}</span>
+      <span class="lbl">ta uy ishi kutmoqda${mine ? ` · ${mine} tasi sizda` : ""}</span>
+    </a>
+    <a class="card ov wide" href="taomlar.html">
+      <span class="ov-ico" style="background:var(--honey-soft);color:#8E6520"><i data-lucide="utensils"></i></span>
+      <span class="grow" style="flex:1;min-width:0">
+        <span class="lbl">${meal ? slotName[meal.slot] : "Bugungi taom"}</span><br>
+        <span class="val">${meal ? esc(meal.title) : "Hali rejalashtirilmagan"}</span>
+      </span>
+      <i data-lucide="chevron-right" style="color:var(--muted)"></i>
+    </a>
+    <a class="card ov wide" href="uy-ishlari.html">
+      <span class="ov-ico" style="background:#E6ECF1;color:var(--him)"><i data-lucide="alarm-clock"></i></span>
+      <span class="grow" style="flex:1;min-width:0">
+        <span class="lbl">Yaqin eslatmalar</span><br>
+        <span class="val">${reminders.length ? esc(reminders[0].title) + ` <span class="muted small" style="font-weight:400">· ${App.fmtShort(reminders[0].remind_at ? App.ymd(new Date(reminders[0].remind_at)) : reminders[0].due_date)}</span>` : "Eslatma yo'q"}</span>
+        ${reminders.length > 1 ? `<span class="small muted">yana ${reminders.length - 1} ta</span>` : ""}
+      </span>
+      <i data-lucide="chevron-right" style="color:var(--muted)"></i>
+    </a>`;
+
+  const ICON = { grocery: "shopping-basket", meals: "utensils", memories: "heart", tasks: "sparkles" };
+  $("#activity").innerHTML = acts.length ? acts.map((a) => `
+    <div class="row act">
+      <span class="who">${App.avatar(App.person(a.actor_id), "sm")}</span>
+      <div class="grow"><div style="font-size:14px">${esc(a.text)}</div><div class="meta"><i data-lucide="${ICON[a.module] || "dot"}" style="width:12px;height:12px"></i>${App.timeAgo(a.created_at)}</div></div>
+    </div>`).join("")
+    : `<div class="empty"><div class="ico"><i data-lucide="home"></i></div><strong>Uyingiz endi jonlanadi</strong><p>Birinchi mahsulot yoki ishni qo'shing — juftingiz darhol ko'radi.</p><a class="btn ghost" href="rozgor.html?new=1">Mahsulot qo'shish</a></div>`;
+  icons();
+}
+
+App.boot({ page: "home", home: true, tables: ["grocery_items", "meals", "tasks", "activity"], render });
+</script>
+</body>
+</html>

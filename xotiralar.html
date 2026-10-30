@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<title>Oilaviy xotiralar — Oila Uchun</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4EEE6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+<style>
+  /* Memories feel like a private album: deeper paper tone, serif voice, generous photos */
+  .app { background: #F7F0E6; }
+  .topbar { background: #F7F0E6; }
+  .intro { text-align: center; padding: 4px 12px 2px; }
+  .intro p { margin: 0; font-family: var(--serif); font-style: italic; color: var(--ink-2); font-size: 15px; }
+  .intro .lock { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .intro .lock svg { width: 13px; height: 13px; }
+
+  .timeline { position: relative; margin-top: 18px; padding-left: 22px; }
+  .timeline::before { content: ""; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 1.5px; background: linear-gradient(var(--line-2), transparent); }
+  .year { position: relative; font-family: var(--serif); font-size: 22px; font-weight: 500; margin: 6px 0 12px; color: var(--accent); }
+  .year::before { content: ""; position: absolute; left: -22px; top: 50%; width: 13px; height: 13px; margin-top: -6.5px; border-radius: 50%; background: #F7F0E6; border: 2px solid var(--accent); }
+
+  .mem { position: relative; margin-bottom: 18px; overflow: hidden; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 2px 4px rgba(60,40,20,.04), 0 14px 30px rgba(60,40,20,.08); cursor: pointer; animation: rise 520ms var(--ease) both; transition: transform var(--t-fast); }
+  .mem:active { transform: scale(.985); }
+  .mem::before { content: ""; position: absolute; left: -17px; top: 26px; width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); }
+  .mem .ph { aspect-ratio: 4 / 3; background: #EADFD0; position: relative; }
+  .mem .ph img { width: 100%; height: 100%; object-fit: cover; }
+  .mem .ph .noimg { position: absolute; inset: 0; display: grid; place-items: center; color: #B9A58E; background: radial-gradient(circle at 30% 30%, #F3E7D8, #E6D7C3); }
+  .mem .ph .noimg svg { width: 40px; height: 40px; stroke-width: 1.3; }
+  .mem .tx { padding: 14px 16px 16px; }
+  .mem .dt { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .mem h3 { margin: 4px 0 4px; font-family: var(--serif); font-weight: 500; font-size: 22px; line-height: 1.2; }
+  .mem p { margin: 0; color: var(--ink-2); font-size: 14.5px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .mem .by { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 16px; border-radius: 16px; overflow: hidden; }
+  .gallery button { padding: 0; border: 0; aspect-ratio: 1; background: #EADFD0; overflow: hidden; animation: rise 420ms var(--ease) both; }
+  .gallery img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--t) var(--ease); }
+  .gallery button:active img { transform: scale(1.04); }
+
+  .detail-photo { margin: 0 -16px 14px; background: #2F2A25; }
+  .detail-photo img { width: 100%; max-height: 52vh; object-fit: contain; }
+  .detail h2 { font-family: var(--serif); font-weight: 500; font-size: 26px; margin: 2px 0 6px; line-height: 1.2; }
+  .detail p { white-space: pre-wrap; color: var(--ink-2); font-size: 15.5px; line-height: 1.6; margin: 0; }
+
+  .drop { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; border: 1.5px dashed var(--line-2); border-radius: 16px; background: var(--surface-2); color: var(--muted); overflow: hidden; text-align: center; font-size: 14px; }
+  .drop svg { width: 28px; height: 28px; margin: 0 auto 6px; }
+  .drop img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop .change { position: absolute; right: 10px; bottom: 10px; background: rgba(47,42,37,.8); color: #fff; border-radius: 10px; padding: 6px 10px; font-size: 12.5px; font-weight: 600; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="main" id="main">
+    <div class="intro">
+      <p>Birga o'tgan har bir lahza — bizning tariximiz.</p>
+      <span class="lock"><i data-lucide="lock"></i>Faqat ikkingiz ko'ra olasiz</span>
+    </div>
+    <div class="segmented" style="margin-top:14px" role="tablist" aria-label="Ko'rinish">
+      <button role="tab" data-view="timeline"><i data-lucide="git-commit-vertical" style="width:16px;height:16px"></i>Xronologiya</button>
+      <button role="tab" data-view="gallery"><i data-lucide="layout-grid" style="width:16px;height:16px"></i>Galereya</button>
+    </div>
+    <div id="content"><div class="skeleton" style="height:300px;margin-top:18px;border-radius:20px"></div></div>
+  </main>
+  <button class="fab" id="add" aria-label="Xotira saqlash" style="background:var(--accent)"><i data-lucide="plus"></i></button>
+</div>
+
+<script>
+const { $, $$, esc, icons } = App;
+const SUGGEST = ["Birinchi uchrashuvimiz", "Birinchi sayohatimiz", "Tug'ilgan kun", "Unutilmas kun", "Birgalikdagi lahzalar"];
+let view = "timeline";
+let memories = [];
+let urls = {};
+let loaded = false;
+
+async function render() {
+  memories = await Store.list("memories", { order: "memory_date" });
+  urls = await Store.photoUrls(memories.map((m) => m.photo_path));
+  loaded = true;
+  draw();
+}
+
+function setView(v) { view = v; $$(".segmented button").forEach((b) => { const on = b.dataset.view === v; b.classList.toggle("active", on); b.setAttribute("aria-selected", on); }); if (loaded) draw(); }
+
+function draw() {
+  const c = $("#content");
+  if (!memories.length) {
+    c.innerHTML = `<div class="empty" style="margin-top:36px"><div class="ico" style="background:var(--accent-soft);color:var(--accent);border:0"><i data-lucide="heart"></i></div>
+      <strong class="serif" style="font-size:20px;font-weight:500">Birinchi xotirangizni saqlang</strong><p>Rasm, sana va bir-ikki jumla — yillar o'tib qayta o'qish qanchalik yoqimli bo'ladi.</p>
+      <button class="btn accent" onclick="openEditor()"><i data-lucide="camera"></i>Xotira saqlash</button></div>`;
+    return icons();
+  }
+  if (view === "gallery") {
+    const withPhoto = memories.filter((m) => urls[m.photo_path]);
+    c.innerHTML = withPhoto.length ? `<div class="gallery">${withPhoto.map((m, i) => `<button data-id="${m.id}" style="animation-delay:${Math.min(i, 12) * 30}ms" aria-label="${esc(m.title)}"><img src="${esc(urls[m.photo_path])}" alt="${esc(m.title)}" loading="lazy"></button>`).join("")}</div>`
+      : `<div class="empty" style="margin-top:30px"><div class="ico"><i data-lucide="image"></i></div><strong>Hali rasm yo'q</strong><p>Xotiralarga rasm qo'shsangiz, galereya shu yerda to'ladi.</p></div>`;
+    return icons();
+  }
+  let html = `<div class="timeline">`, lastYear = null;
+  memories.forEach((m, i) => {
+    const y = (m.memory_date || "").slice(0, 4);
+    if (y !== lastYear) { html += `<div class="year">${esc(y)}</div>`; lastYear = y; }
+    const who = App.person(m.created_by);
+    html += `<article class="mem" data-id="${m.id}" tabindex="0" role="button" style="animation-delay:${Math.min(i, 8) * 60}ms">
+      <div class="ph">${urls[m.photo_path] ? `<img src="${esc(urls[m.photo_path])}" alt="" loading="lazy">` : `<div class="noimg"><i data-lucide="heart"></i></div>`}</div>
+      <div class="tx"><div class="dt">${App.fmtDate(m.memory_date)}</div><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}
+      ${who ? `<div class="by">${App.avatar(who, "sm")}${esc(App.firstName(who))} saqlagan</div>` : ""}</div></article>`;
+  });
+  c.innerHTML = html + "</div>";
+  icons();
+}
+
+$("#content").addEventListener("click", (e) => { const el = e.target.closest("[data-id]"); if (el) openDetail(memories.find((m) => m.id === el.dataset.id)); });
+$("#content").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.dataset.id) e.target.click(); });
+
+function openDetail(m) {
+  App.sheet({
+    title: "Xotira",
+    body: `<div class="detail">${urls[m.photo_path] ? `<div class="detail-photo"><img src="${esc(urls[m.photo_path])}" alt="${esc(m.title)}"></div>` : ""}
+      <div class="small muted" style="letter-spacing:.08em;text-transform:uppercase">${App.fmtDate(m.memory_date)}</div>
+      <h2>${esc(m.title)}</h2>${m.description ? `<p>${esc(m.description)}</p>` : ""}
+      <p class="hint" style="margin-top:14px">${esc(App.nameOf(m.created_by))} saqlagan</p></div>`,
+    foot: `<button class="btn danger" data-del aria-label="Xotirani o'chirish"><i data-lucide="trash-2"></i></button><button class="btn ghost" data-edit><i data-lucide="pencil"></i>Tahrirlash</button>`,
+    onMount(el, api) {
+      $("[data-edit]", el).addEventListener("click", () => { api.close(); setTimeout(() => openEditor(m), 300); });
+      $("[data-del]", el).addEventListener("click", async () => {
+        api.close();
+        if (!(await App.confirm(`«${m.title}» xotirasi va uning rasmi butunlay o'chiriladi.`, "Xotirani o'chirish"))) return;
+        try { await Store.remove("memories", m.id); await Store.removePhoto(m.photo_path); App.toast("Xotira o'chirildi", "trash-2"); render(); } catch (e) { App.fail(e); }
+      });
+    },
+  });
+}
+
+function openEditor(mem) {
+  const isNew = !mem;
+  const m = mem || { title: "", description: "", memory_date: App.today(), photo_path: null };
+  let blob = null;
+  App.sheet({
+    title: isNew ? "Yangi xotira" : "Xotirani tahrirlash",
+    body: `<form id="xform" novalidate>
+      <div class="field"><span class="label">Rasm</span>
+        <label class="drop" id="drop">${urls[m.photo_path] ? `<img src="${esc(urls[m.photo_path])}" alt=""><span class="change">Almashtirish</span>` : `<span><i data-lucide="image-plus"></i><br>Rasm tanlash</span>`}
+          <input type="file" accept="image/*" id="x-file" aria-label="Rasm tanlash"></label></div>
+      <div class="field"><label for="x-title">Sarlavha</label><input class="input" id="x-title" name="title" value="${esc(m.title)}" maxlength="80" autocomplete="off"><span class="error-text" hidden id="x-err">Sarlavha yozing</span>
+        <div class="hscroll" style="margin-top:4px">${SUGGEST.map((s) => `<button type="button" class="chip" data-s="${esc(s)}" style="padding:6px 10px;white-space:nowrap">${esc(s)}</button>`).join("")}</div></div>
+      <div class="field"><label for="x-date">Sana</label><input class="input" type="date" id="x-date" name="memory_date" value="${esc(m.memory_date)}" max="${App.today()}"></div>
+      <div class="field"><label for="x-desc">Qisqacha hikoya</label><textarea class="textarea" id="x-desc" name="description" maxlength="1000">${esc(m.description)}</textarea></div>
+    </form>`,
+    foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn accent" data-save>${isNew ? "Saqlash" : "O'zgarishlarni saqlash"}</button>`,
+    onMount(el, api) {
+      const f = $("#xform", el);
+      $$("[data-s]", el).forEach((b) => b.addEventListener("click", () => { f.elements.title.value = b.dataset.s; $("#x-err", el).hidden = true; }));
+      f.elements.title.addEventListener("input", () => ($("#x-err", el).hidden = true));
+      $("#x-file", el).addEventListener("change", async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        try { blob = await Store.compressImage(file, Store.mode === "demo" ? 900 : 1600, Store.mode === "demo" ? 0.72 : 0.85); }
+        catch (err) { return App.toast("Bu rasmni ochib bo'lmadi. Boshqa rasm tanlang.", "image-off"); }
+        const drop = $("#drop", el);
+        drop.querySelectorAll("img, span").forEach((n) => n.remove());
+        drop.insertAdjacentHTML("afterbegin", `<img src="${URL.createObjectURL(blob)}" alt=""><span class="change">Almashtirish</span>`);
+      });
+      $("[data-save]", el).addEventListener("click", async () => {
+        const v = { title: f.elements.title.value.trim(), memory_date: f.elements.memory_date.value || App.today(), description: f.elements.description.value.trim() };
+        if (!v.title) { $("#x-err", el).hidden = false; f.elements.title.focus(); return; }
+        const btn = $("[data-save]", el); btn.disabled = true; btn.textContent = blob ? "Rasm yuklanmoqda…" : "Saqlanmoqda…";
+        try {
+          if (blob) { v.photo_path = await Store.uploadPhoto(blob); if (!isNew && m.photo_path) Store.removePhoto(m.photo_path); }
+          if (isNew) {
+            await Store.insert("memories", { ...v, photo_path: v.photo_path || null, created_by: Store.ctx.profile.id });
+            Store.log("memories", `${App.firstName(Store.ctx.profile)} yangi xotira saqladi: «${v.title}»`, "xotiralar.html");
+            App.toast("Xotira saqlandi", "heart");
+          } else {
+            await Store.update("memories", m.id, v);
+            App.toast("Saqlandi");
+          }
+          api.close(); render();
+        } catch (e) { App.fail(e); btn.disabled = false; btn.textContent = "Saqlash"; }
+      });
+    },
+  });
+}
+window.openEditor = openEditor;
+
+$$(".segmented button").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+$("#add").addEventListener("click", () => openEditor());
+setView("timeline");
+App.boot({ page: "xotiralar", title: "Oilaviy xotiralar", tables: ["memories"], render }).then(() => {
+  if (new URLSearchParams(location.search).get("new")) openEditor();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<title>Taomlar menyusi — Oila Uchun</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4EEE6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+<style>
+  .weeknav { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
+  .weeknav .label { flex: 1; text-align: center; font-weight: 600; font-size: 14px; }
+  .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .day { border: 1px solid transparent; background: none; border-radius: 14px; padding: 8px 0 7px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink-2); transition: all var(--t) var(--ease); }
+  .day .wd { font-size: 11.5px; color: var(--muted); }
+  .day .dn { font-size: 17px; font-weight: 600; font-family: var(--serif); }
+  .day .dots { display: flex; gap: 2px; height: 5px; }
+  .day .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--line-2); }
+  .day .dots i.f { background: var(--honey); }
+  .day.today .dn { color: var(--accent); }
+  .day.active { background: var(--ink); color: #FFF8EF; }
+  .day.active .wd { color: #CFC4B8; }
+  .day.active .dn { color: #FFF8EF; }
+  .day.active .dots i.f { background: #E8C9A8; }
+
+  .slot { margin-top: 12px; padding: 14px; }
+  .slot-h { display: flex; align-items: center; gap: 10px; }
+  .slot-h .si { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex: none; }
+  .slot-h .si svg { width: 18px; height: 18px; }
+  .slot-h .sl { flex: 1; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .meal { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-2); cursor: pointer; }
+  .meal:first-of-type { border-top: 0; padding-top: 0; }
+  .meal h4 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 19px; display: flex; align-items: center; gap: 6px; }
+  .meal h4 svg { width: 15px; height: 15px; color: var(--honey); fill: var(--honey); flex: none; }
+  .meal p { margin: 3px 0 0; font-size: 13.5px; color: var(--ink-2); }
+  .ings { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .add-slot { margin-top: 10px; width: 100%; min-height: 44px; border: 1.5px dashed var(--line-2); border-radius: 12px; background: none; color: var(--muted); font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .add-slot svg { width: 16px; height: 16px; }
+
+  .ing-edit { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .ing-edit .chip { padding: 5px 6px 5px 10px; font-size: 13px; }
+  .ing-edit .chip button { border: 0; background: none; padding: 0 2px; display: grid; place-items: center; color: var(--muted); }
+  .ing-add { display: flex; gap: 8px; }
+  .ing-add .input { flex: 1; }
+
+  .pick { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); min-height: 52px; }
+  .pick input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+  .pick .st { margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="main" id="main">
+    <div class="weeknav">
+      <button class="icon-btn" id="prev" aria-label="Oldingi hafta"><i data-lucide="chevron-left"></i></button>
+      <span class="label" id="wlabel"></span>
+      <button class="icon-btn" id="next" aria-label="Keyingi hafta"><i data-lucide="chevron-right"></i></button>
+    </div>
+    <div class="days" id="days" role="tablist" aria-label="Hafta kunlari"></div>
+    <div id="slots"></div>
+    <div class="bar" style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn ghost" style="flex:1;font-size:14px" id="fav-btn"><i data-lucide="star"></i>Sevimlilar</button>
+      <button class="btn ghost" style="flex:1;font-size:14px" id="past-btn"><i data-lucide="history"></i>Avvalgi taomlar</button>
+    </div>
+  </main>
+</div>
+
+<script>
+const { $, $$, esc, icons } = App;
+const SLOTS = [
+  { id: "nonushta", name: "Nonushta", icon: "coffee", bg: "var(--honey-soft)", fg: "#8E6520" },
+  { id: "tushlik", name: "Tushlik", icon: "sun", bg: "var(--sage-soft)", fg: "var(--sage)" },
+  { id: "kechki", name: "Kechki ovqat", icon: "moon", bg: "#E6ECF1", fg: "var(--him)" },
+];
+const slotName = (id) => (SLOTS.find((s) => s.id === id) || {}).name;
+
+function weekStart(s) { const d = App.parseYmd(s); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return App.ymd(d); }
+let selected = App.today();
+let meals = [];
+let groceries = [];
+
+async function render() {
+  [meals, groceries] = await Promise.all([Store.list("meals", { order: "created_at", asc: true }), Store.list("grocery_items")]);
+  draw();
+}
+
+function draw() {
+  const start = weekStart(selected);
+  const days = Array.from({ length: 7 }, (_, i) => App.addDays(start, i));
+  const s = App.parseYmd(days[0]), e = App.parseYmd(days[6]);
+  $("#wlabel").textContent = start === weekStart(App.today()) ? "Shu hafta" : `${s.getDate()}-${App.MONTHS[s.getMonth()]} – ${e.getDate()}-${App.MONTHS[e.getMonth()]}`;
+  $("#days").innerHTML = days.map((d) => {
+    const dt = App.parseYmd(d);
+    const filled = SLOTS.map((sl) => meals.some((m) => m.day_date === d && m.slot === sl.id));
+    return `<button class="day ${d === selected ? "active" : ""} ${d === App.today() ? "today" : ""}" data-d="${d}" role="tab" aria-selected="${d === selected}" aria-label="${App.WEEKDAYS[dt.getDay()]}, ${dt.getDate()}-${App.MONTHS[dt.getMonth()]}">
+      <span class="wd">${App.WEEKDAYS_SHORT[dt.getDay()]}</span><span class="dn">${dt.getDate()}</span>
+      <span class="dots">${filled.map((f) => `<i class="${f ? "f" : ""}"></i>`).join("")}</span></button>`;
+  }).join("");
+
+  const dt = App.parseYmd(selected);
+  $("#slots").innerHTML = `<div class="section-head" style="margin-top:18px"><h2>${App.fmtShort(selected) === "Bugun" ? "Bugun · " : ""}${App.WEEKDAYS[dt.getDay()]}, ${dt.getDate()}-${App.MONTHS[dt.getMonth()]}</h2></div>` +
+    SLOTS.map((sl) => {
+      const list = meals.filter((m) => m.day_date === selected && m.slot === sl.id);
+      return `<div class="card slot">
+        <div class="slot-h"><span class="si" style="background:${sl.bg};color:${sl.fg}"><i data-lucide="${sl.icon}"></i></span><span class="sl">${sl.name}</span></div>
+        ${list.map((m) => `<div class="meal" data-id="${m.id}" role="button" tabindex="0">
+          <h4>${esc(m.title)}${m.favorite ? `<i data-lucide="star"></i>` : ""}</h4>
+          ${m.description ? `<p>${esc(m.description)}</p>` : ""}
+          ${m.ingredients && m.ingredients.length ? `<div class="ings">${m.ingredients.map((g) => `<span class="chip">${esc(g)}</span>`).join("")}</div>` : ""}
+        </div>`).join("")}
+        ${list.length ? "" : `<button class="add-slot" data-add="${sl.id}"><i data-lucide="plus"></i>${sl.name} qo'shish</button>`}
+      </div>`;
+    }).join("");
+  icons();
+}
+
+$("#days").addEventListener("click", (e) => { const b = e.target.closest(".day"); if (b) { selected = b.dataset.d; draw(); } });
+$("#prev").addEventListener("click", () => { selected = App.addDays(selected, -7); draw(); });
+$("#next").addEventListener("click", () => { selected = App.addDays(selected, 7); draw(); });
+$("#slots").addEventListener("click", (e) => {
+  const a = e.target.closest("[data-add]"); if (a) return openEditor(null, { slot: a.dataset.add });
+  const m = e.target.closest(".meal"); if (m) openEditor(meals.find((x) => x.id === m.dataset.id));
+});
+$("#slots").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("meal")) e.target.click(); });
+
+/* ---------- editor ---------- */
+function openEditor(meal, preset = {}) {
+  const isNew = !meal;
+  const m = meal || { title: "", description: "", ingredients: [], notes: "", favorite: false, slot: preset.slot || "kechki", day_date: selected, ...preset };
+  let ings = [...(m.ingredients || [])];
+  App.sheet({
+    title: isNew ? "Taom qo'shish" : "Taom",
+    body: `<form id="mform" novalidate>
+      <div class="field"><label for="m-title">Taom nomi</label><input class="input" id="m-title" name="title" value="${esc(m.title)}" autocomplete="off" ${isNew ? "autofocus" : ""} maxlength="60" list="known"><span class="error-text" hidden id="m-err">Taom nomini yozing</span>
+        <datalist id="known">${[...new Set(meals.map((x) => x.title))].map((t) => `<option value="${esc(t)}">`).join("")}</datalist></div>
+      <div class="field-row">
+        <div class="field"><label for="m-day">Kun</label><input class="input" type="date" id="m-day" name="day_date" value="${m.day_date}"></div>
+        <div class="field"><label for="m-slot">Vaqti</label><select class="select" id="m-slot" name="slot">${SLOTS.map((s) => `<option value="${s.id}" ${s.id === m.slot ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>
+      </div>
+      <div class="field"><label for="m-desc">Tavsif</label><input class="input" id="m-desc" name="description" value="${esc(m.description)}" maxlength="120"></div>
+      <div class="field"><span class="label">Masalliqlar</span>
+        <div class="ing-edit" id="ing-list"></div>
+        <div class="ing-add"><input class="input" id="ing-in" placeholder="masalan, Kartoshka" aria-label="Masalliq nomi" maxlength="40"><button type="button" class="btn ghost" id="ing-add" aria-label="Masalliq qo'shish"><i data-lucide="plus"></i></button></div>
+      </div>
+      <div class="field"><label for="m-notes">Tayyorlash bo'yicha izoh</label><textarea class="textarea" id="m-notes" name="notes" maxlength="500">${esc(m.notes)}</textarea></div>
+      <label class="switch"><span><b style="font-weight:600">Sevimli taom</b><br><span class="hint">Keyin bir bosishda qayta rejalashtirish uchun</span></span><input type="checkbox" name="favorite" ${m.favorite ? "checked" : ""}></label>
+      <button type="button" class="btn ghost block" id="to-grocery" style="margin-top:12px"><i data-lucide="shopping-basket"></i>Masalliqlarni Ro'zg'orga yuborish</button>
+    </form>`,
+    foot: `${isNew ? `<button class="btn ghost" data-close>Bekor qilish</button>` : `<button class="btn danger" data-del aria-label="Taomni o'chirish"><i data-lucide="trash-2"></i></button>`}<button class="btn primary" data-save>${isNew ? "Qo'shish" : "Saqlash"}</button>`,
+    onMount(el, api) {
+      const f = $("#mform", el);
+      const drawIngs = () => {
+        $("#ing-list", el).innerHTML = ings.map((g, i) => `<span class="chip">${esc(g)}<button type="button" data-rm="${i}" aria-label="${esc(g)} ni olib tashlash"><i data-lucide="x" style="width:14px;height:14px"></i></button></span>`).join("");
+        $("#to-grocery", el).hidden = !ings.length;
+        icons();
+      };
+      const addIng = () => {
+        const inp = $("#ing-in", el);
+        inp.value.split(",").map((x) => x.trim()).filter(Boolean).forEach((x) => { if (!ings.some((g) => g.toLowerCase() === x.toLowerCase())) ings.push(x); });
+        inp.value = ""; drawIngs(); inp.focus();
+      };
+      drawIngs();
+      $("#ing-add", el).addEventListener("click", addIng);
+      $("#ing-in", el).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIng(); } });
+      $("#ing-list", el).addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (b) { ings.splice(+b.dataset.rm, 1); drawIngs(); } });
+      // Reusing a known meal fills its ingredients
+      f.elements.title.addEventListener("change", () => {
+        const known = [...meals].reverse().find((x) => x.title.toLowerCase() === f.elements.title.value.trim().toLowerCase());
+        if (known && !ings.length) { ings = [...(known.ingredients || [])]; if (!f.elements.description.value) f.elements.description.value = known.description || ""; if (!f.elements.notes.value) f.elements.notes.value = known.notes || ""; drawIngs(); }
+      });
+      f.elements.title.addEventListener("input", () => ($("#m-err", el).hidden = true));
+      $("#to-grocery", el).addEventListener("click", () => sendToGrocery(ings, f.elements.title.value.trim() || "taom"));
+
+      const save = async () => {
+        if ($("#ing-in", el).value.trim()) addIng();
+        const v = { title: f.elements.title.value.trim(), day_date: f.elements.day_date.value || selected, slot: f.elements.slot.value, description: f.elements.description.value.trim(), notes: f.elements.notes.value.trim(), favorite: f.elements.favorite.checked, ingredients: ings };
+        if (!v.title) { $("#m-err", el).hidden = false; f.elements.title.focus(); return; }
+        $("[data-save]", el).disabled = true;
+        try {
+          if (isNew) {
+            await Store.insert("meals", { ...v, created_by: Store.ctx.profile.id });
+            Store.log("meals", `${App.firstName(Store.ctx.profile)} menyuga «${v.title}» qo'shdi (${App.fmtShort(v.day_date)}, ${slotName(v.slot).toLowerCase()})`, "taomlar.html");
+            App.toast(`«${v.title}» rejaga qo'shildi`);
+          } else {
+            await Store.update("meals", m.id, v);
+            App.toast("Saqlandi");
+          }
+          selected = v.day_date; api.close(); render();
+        } catch (e) { App.fail(e); $("[data-save]", el).disabled = false; }
+      };
+      $("[data-save]", el).addEventListener("click", save);
+      f.addEventListener("submit", (e) => { e.preventDefault(); save(); });
+      const del = $("[data-del]", el);
+      if (del) del.addEventListener("click", async () => {
+        api.close();
+        if (!(await App.confirm(`«${m.title}» menyudan olib tashlanadi.`, "Taomni o'chirish"))) return;
+        try { await Store.remove("meals", m.id); App.toast("O'chirildi", "trash-2"); render(); } catch (e) { App.fail(e); }
+      });
+    },
+  });
+}
+
+/* ---------- send ingredients to Ro'zg'or ---------- */
+function sendToGrocery(ings, mealTitle) {
+  const find = (n) => groceries.find((g) => g.name.trim().toLowerCase() === n.trim().toLowerCase());
+  App.sheet({
+    title: "Ro'zg'orga yuborish",
+    body: `<p class="hint" style="margin:0 0 6px">Uyda yo'q masalliqlarni belgilang — ular «Kerak» ro'yxatiga tushadi.</p>
+      ${ings.map((n, i) => { const g = find(n); const st = g ? g.status : null;
+        return `<label class="pick"><input type="checkbox" value="${i}" ${st === "kerak" ? "disabled" : st === "bor" ? "" : "checked"}><span>${esc(n)}</span>
+          <span class="st">${st === "kerak" ? `<span class="chip urgent">Ro'yxatda bor</span>` : st === "bor" ? `<span class="chip sage">Uyda bor</span>` : `<span class="chip">Yangi</span>`}</span></label>`; }).join("")}`,
+    foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn accent" data-send><i data-lucide="send"></i>Yuborish</button>`,
+    onMount(el, api) {
+      $("[data-send]", el).addEventListener("click", async () => {
+        const chosen = $$("input:checked:not(:disabled)", el).map((c) => ings[+c.value]);
+        if (!chosen.length) return api.close();
+        const me = Store.ctx.profile.id, now = new Date().toISOString();
+        $("[data-send]", el).disabled = true;
+        try {
+          for (const n of chosen) {
+            const g = find(n);
+            if (g) await Store.update("grocery_items", g.id, { status: "kerak", marked_by: me, marked_at: now, purchased_by: null, purchased_at: null });
+            else await Store.insert("grocery_items", { name: n, category: "boshqa", quantity: "", note: `«${mealTitle}» uchun`, urgent: false, status: "kerak", added_by: me, marked_by: me, marked_at: now });
+          }
+          Store.log("grocery", `${App.firstName(Store.ctx.profile)} «${mealTitle}» uchun ${chosen.length} ta masalliqni ro'zg'orga qo'shdi`, "rozgor.html?view=need");
+          App.toast(`${chosen.length} ta masalliq Ro'zg'orga yuborildi`, "shopping-basket");
+          api.close(); groceries = await Store.list("grocery_items");
+        } catch (e) { App.fail(e); $("[data-send]", el).disabled = false; }
+      });
+    },
+  });
+}
+
+/* ---------- favorites & past meals ---------- */
+function uniqueMeals(list) {
+  const seen = new Map();
+  [...list].sort((a, b) => (a.day_date < b.day_date ? 1 : -1)).forEach((m) => { const k = m.title.toLowerCase(); if (!seen.has(k)) seen.set(k, m); });
+  return [...seen.values()];
+}
+function openLibrary(kind) {
+  const list = kind === "fav" ? uniqueMeals(meals.filter((m) => m.favorite)) : uniqueMeals(meals.filter((m) => m.day_date < App.today()));
+  App.sheet({
+    title: kind === "fav" ? "Sevimli taomlar" : "Avvalgi taomlar",
+    body: list.length ? `<p class="hint" style="margin:0 0 6px">Taomni tanlang — u ${App.fmtShort(selected).toLowerCase()} uchun rejaga qo'shiladi.</p><div class="list">${list.map((m) => `
+        <button class="row" data-id="${m.id}" style="width:100%;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;padding:12px 2px">
+          <div class="grow"><div class="title">${esc(m.title)}</div><div class="meta">${slotName(m.slot)} · ${App.fmtDate(m.day_date)}${m.ingredients && m.ingredients.length ? ` · ${m.ingredients.length} masalliq` : ""}</div></div>
+          <i data-lucide="calendar-plus" style="color:var(--accent)"></i></button>`).join("")}</div>`
+      : `<div class="empty"><div class="ico"><i data-lucide="${kind === "fav" ? "star" : "history"}"></i></div><strong>${kind === "fav" ? "Sevimlilar yo'q" : "Hali tarix yo'q"}</strong><p>${kind === "fav" ? "Taomni ochib, «Sevimli taom»ni yoqing." : "O'tgan kunlar uchun rejalashtirilgan taomlar shu yerda ko'rinadi."}</p></div>`,
+    onMount(el, api) {
+      el.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-id]"); if (!b) return;
+        const src = meals.find((x) => x.id === b.dataset.id);
+        api.close();
+        setTimeout(() => openEditor(null, { title: src.title, description: src.description, ingredients: [...(src.ingredients || [])], notes: src.notes, favorite: src.favorite, slot: src.slot, day_date: selected }), 300);
+      });
+    },
+  });
+}
+$("#fav-btn").addEventListener("click", () => openLibrary("fav"));
+$("#past-btn").addEventListener("click", () => openLibrary("past"));
+
+draw();
+App.boot({ page: "taomlar", title: "Taomlar menyusi", sub: "Haftalik oilaviy reja", tables: ["meals", "grocery_items"], render }).then(() => {
+  if (new URLSearchParams(location.search).get("new")) openEditor();
+});
+</script>
+</body>
+</html>

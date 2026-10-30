@@ -1,0 +1,301 @@
+/* Oila Uchun — shared shell: auth guard, top bar, bottom tabs, sheets, toasts, notifications. */
+(function () {
+  const TABS = [
+    { href: "index.html", id: "home", icon: "house", label: "Bosh sahifa" },
+    { href: "rozgor.html", id: "rozgor", icon: "shopping-basket", label: "Ro'zg'or" },
+    { href: "taomlar.html", id: "taomlar", icon: "utensils", label: "Taomlar" },
+    { href: "xotiralar.html", id: "xotiralar", icon: "heart", label: "Xotiralar" },
+    { href: "uy-ishlari.html", id: "uy", icon: "sparkles", label: "Uy ishlari" },
+  ];
+  const MODULE_ICON = { grocery: "shopping-basket", meals: "utensils", memories: "heart", tasks: "sparkles" };
+
+  const MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+  const WEEKDAYS = ["Yakshanba", "Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba"];
+  const WEEKDAYS_SHORT = ["Ya", "Du", "Se", "Ch", "Pa", "Ju", "Sh"];
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  function icons() { if (window.lucide) window.lucide.createIcons({ attrs: { "stroke-width": 1.8 } }); }
+
+  /* ---------- dates ---------- */
+  const pad = (n) => String(n).padStart(2, "0");
+  const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseYmd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const today = () => ymd(new Date());
+  const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
+  const fmtLong = (d) => `${WEEKDAYS[d.getDay()]}, ${d.getDate()}-${MONTHS[d.getMonth()]}`;
+  const fmtDate = (s) => { if (!s) return ""; const d = parseYmd(s.slice(0, 10)); return `${d.getDate()}-${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
+  const fmtShort = (s) => {
+    if (!s) return "";
+    const t = today();
+    if (s === t) return "Bugun";
+    if (s === addDays(t, 1)) return "Ertaga";
+    if (s === addDays(t, -1)) return "Kecha";
+    const d = parseYmd(s);
+    return `${d.getDate()}-${MONTHS[d.getMonth()]}`;
+  };
+  function timeAgo(iso) {
+    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60) return "hozirgina";
+    if (diff < 3600) return `${Math.floor(diff / 60)} daqiqa oldin`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} soat oldin`;
+    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} kun oldin`;
+    return fmtDate(iso);
+  }
+  function greeting() {
+    const h = new Date().getHours();
+    if (h < 5) return "Xayrli tun";
+    if (h < 11) return "Xayrli tong";
+    if (h < 18) return "Xayrli kun";
+    return "Xayrli kech";
+  }
+
+  /* ---------- people ---------- */
+  function person(id) {
+    const c = Store.ctx;
+    if (!c || !id) return null;
+    if (c.profile && c.profile.id === id) return c.profile;
+    if (c.partner && c.partner.id === id) return c.partner;
+    return null;
+  }
+  const firstName = (p) => (p && p.full_name ? p.full_name.split(" ")[0] : "Kimdir");
+  const nameOf = (id) => firstName(person(id));
+  const isMe = (id) => Store.ctx && Store.ctx.profile.id === id;
+  function avatar(p, cls = "") {
+    if (!p) return "";
+    const initial = esc((p.full_name || "?").trim().charAt(0).toUpperCase());
+    return `<span class="avatar ${p.role === "er" ? "him" : "her"} ${cls}" title="${esc(p.full_name)}">${initial}</span>`;
+  }
+
+  /* ---------- toast ---------- */
+  function toast(text, icon = "check") {
+    let wrap = $(".toast-wrap");
+    if (!wrap) { wrap = document.createElement("div"); wrap.className = "toast-wrap"; wrap.setAttribute("role", "status"); wrap.setAttribute("aria-live", "polite"); $(".app").appendChild(wrap); }
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.innerHTML = `<i data-lucide="${icon}"></i><span>${esc(text)}</span>`;
+    wrap.appendChild(t); icons();
+    setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 220); }, 2600);
+  }
+  function fail(e) {
+    console.error(e);
+    toast("Saqlab bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.", "wifi-off");
+  }
+
+  /* ---------- bottom sheet ---------- */
+  function sheet({ title, body, foot, onMount, onClose }) {
+    const app = $(".app");
+    const lastFocus = document.activeElement;
+    const back = document.createElement("div");
+    back.className = "sheet-backdrop";
+    const el = document.createElement("div");
+    el.className = "sheet"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", title);
+    el.innerHTML = `<div class="grabber"></div>
+      <div class="sheet-head"><h3>${esc(title)}</h3><button class="icon-btn" data-close aria-label="Yopish"><i data-lucide="x"></i></button></div>
+      <div class="sheet-body">${body}</div>${foot ? `<div class="sheet-foot">${foot}</div>` : ""}`;
+    app.append(back, el); icons();
+    requestAnimationFrame(() => { back.classList.add("open"); el.classList.add("open"); });
+    const api = {
+      el,
+      close() {
+        back.classList.remove("open"); el.classList.remove("open");
+        document.removeEventListener("keydown", onKey);
+        setTimeout(() => { back.remove(); el.remove(); }, 280);
+        if (lastFocus && lastFocus.focus) lastFocus.focus();
+        onClose && onClose();
+      },
+    };
+    function onKey(e) {
+      if (e.key === "Escape") api.close();
+      if (e.key === "Tab") {
+        const f = $$("button, input, select, textarea, a[href]", el).filter((x) => !x.disabled && x.offsetParent);
+        if (!f.length) return;
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    back.addEventListener("click", api.close);
+    $$("[data-close]", el).forEach((b) => b.addEventListener("click", api.close));
+    onMount && onMount(el, api);
+    setTimeout(() => { const first = $("[autofocus]", el); if (first) first.focus(); }, 300);
+    return api;
+  }
+
+  function confirmSheet(text, verb = "O'chirish") {
+    return new Promise((resolve) => {
+      let ok = false;
+      sheet({
+        title: "Ishonchingiz komilmi?",
+        body: `<p style="margin:4px 0 8px;color:var(--ink-2)">${esc(text)}</p>`,
+        foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn danger" data-ok>${esc(verb)}</button>`,
+        onMount(el, api) { $("[data-ok]", el).addEventListener("click", () => { ok = true; api.close(); }); },
+        onClose() { resolve(ok); },
+      });
+    });
+  }
+
+  /* ---------- notifications ---------- */
+  let notifCache = [];
+  async function refreshBell() {
+    try { notifCache = await Store.list("notifications", { limit: 60 }); } catch (e) { return; }
+    const n = notifCache.filter((x) => !x.read).length;
+    const dot = $("#bell .dot");
+    if (dot) { dot.textContent = n > 9 ? "9+" : n; dot.hidden = n === 0; }
+    const bell = $("#bell");
+    if (bell) bell.setAttribute("aria-label", n ? `Bildirishnomalar, ${n} ta o'qilmagan` : "Bildirishnomalar");
+  }
+  function notifHtml() {
+    if (!notifCache.length) return `<div class="empty"><div class="ico"><i data-lucide="bell"></i></div><strong>Hozircha bildirishnoma yo'q</strong><p>Juftingiz biror narsa qo'shsa yoki bajarsa, shu yerda ko'rinadi.</p></div>`;
+    return notifCache.map((n) => `<a class="notif ${n.read ? "" : "unread"}" href="${esc(n.link || "#")}" data-id="${n.id}">
+        <span class="n-ico"><i data-lucide="${MODULE_ICON[n.module] || "bell"}"></i></span>
+        <span class="n-text">${esc(n.text)}<div class="n-time">${timeAgo(n.created_at)}</div></span></a>`).join("");
+  }
+  function openNotifications() {
+    const hasUnread = notifCache.some((n) => !n.read);
+    const pushAvail = "Notification" in window && Notification.permission === "default";
+    sheet({
+      title: "Bildirishnomalar",
+      body: `${pushAvail ? `<button class="btn ghost block" data-push style="margin-bottom:10px"><i data-lucide="bell-ring"></i>Brauzer bildirishnomalarini yoqish</button>` : ""}<div data-list>${notifHtml()}</div>`,
+      foot: hasUnread ? `<button class="btn ghost" data-readall><i data-lucide="check-check"></i>Hammasini o'qilgan qilish</button>` : "",
+      onMount(el, api) {
+        const readAll = $("[data-readall]", el);
+        if (readAll) readAll.addEventListener("click", async () => {
+          try { await Store.updateWhere("notifications", { recipient_id: Store.ctx.profile.id, read: false }, { read: true }); } catch (e) { return fail(e); }
+          await refreshBell(); $("[data-list]", el).innerHTML = notifHtml(); icons(); readAll.remove();
+        });
+        const push = $("[data-push]", el);
+        if (push) push.addEventListener("click", async () => { const r = await Notification.requestPermission(); push.remove(); if (r === "granted") toast("Bildirishnomalar yoqildi", "bell-ring"); });
+        $("[data-list]", el).addEventListener("click", async (e) => {
+          const a = e.target.closest(".notif"); if (!a) return;
+          e.preventDefault();
+          try { await Store.update("notifications", a.dataset.id, { read: true }); } catch (err) {}
+          const href = a.getAttribute("href");
+          if (href && href !== "#" && !location.pathname.endsWith(href)) location.href = href;
+          else { await refreshBell(); api.close(); }
+        });
+      },
+    });
+  }
+  function browserPush(n) {
+    if (!("Notification" in window) || Notification.permission !== "granted" || !document.hidden) return;
+    try { new Notification("Oila Uchun", { body: n.text, icon: "assets/icon.svg", tag: n.id }); } catch (e) {}
+  }
+
+  /* ---------- shell rendering ---------- */
+  function topbar({ title, sub, home }) {
+    const c = Store.ctx;
+    const people = [c.profile, c.partner].filter(Boolean).map((p) => avatar(p)).join("");
+    if (home) {
+      return `<header class="topbar">
+        <a href="index.html" class="logo" aria-label="Oila Uchun — bosh sahifa">${logoSvg()}</a>
+        <span style="flex:1"></span>
+        <button class="icon-btn" id="bell" aria-label="Bildirishnomalar"><i data-lucide="bell"></i><span class="dot" hidden></span></button>
+        <button class="avatars" id="me-btn" aria-label="Profil" style="border:0;background:none;padding:0">${people}</button>
+      </header>`;
+    }
+    return `<header class="topbar">
+      <h1>${esc(title)}${sub ? `<span class="sub">${esc(sub)}</span>` : ""}</h1>
+      <button class="icon-btn" id="bell" aria-label="Bildirishnomalar"><i data-lucide="bell"></i><span class="dot" hidden></span></button>
+      <button class="avatars" id="me-btn" aria-label="Profil" style="border:0;background:none;padding:0">${people}</button>
+    </header>`;
+  }
+  function logoSvg() {
+    return `<span style="display:flex;align-items:center;gap:9px">
+      <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="18" fill="#2F2A25"/>
+        <path d="M14 36c4 9 12 14 18 14s14-5 18-14" fill="none" stroke="#E8C9A8" stroke-width="3.2" stroke-linecap="round"/>
+        <path d="M17 40c5 4 10 5 15 5s10-1 15-5" fill="none" stroke="#B8664A" stroke-width="3.2" stroke-linecap="round"/>
+        <circle cx="27" cy="31" r="5.5" fill="#FFF3E6"/><circle cx="37.5" cy="30" r="6.5" fill="#F3DCC4"/></svg>
+      <span style="line-height:1.05"><span class="serif" style="font-size:19px;font-weight:600;letter-spacing:.08em">NEST</span><br><span style="font-size:11.5px;color:var(--muted)">Oila Uchun</span></span></span>`;
+  }
+  function tabbar(active) {
+    return `<nav class="tabbar" aria-label="Asosiy bo'limlar">${TABS.map((t) => `
+      <a class="tab ${t.id === active ? "active" : ""}" href="${t.href}" ${t.id === active ? 'aria-current="page"' : ""}>
+        <span class="pill"><i data-lucide="${t.icon}"></i></span><span>${t.label}</span></a>`).join("")}</nav>`;
+  }
+
+  function openProfile() {
+    const c = Store.ctx;
+    const demo = Store.mode === "demo";
+    sheet({
+      title: "Profil",
+      body: `<div class="card list">
+          <div class="row">${avatar(c.profile)}<div class="grow"><div class="title">${esc(c.profile.full_name)} <span class="chip">Siz</span></div><div class="meta">${c.profile.role === "er" ? "Er" : "Xotin"}</div></div></div>
+          ${c.partner ? `<div class="row">${avatar(c.partner)}<div class="grow"><div class="title">${esc(c.partner.full_name)}</div><div class="meta">${c.partner.role === "er" ? "Er" : "Xotin"}</div></div></div>` : ""}
+        </div>
+        <div class="section"><div class="section-head"><h2>Oila</h2></div>
+          <div class="card list"><div class="row"><i data-lucide="home"></i><div class="grow"><div class="title">${esc(c.household.name)}</div>
+          ${c.partner ? `<div class="meta">2 / 2 a'zo</div>` : `<div class="meta">Taklif kodi: <b style="letter-spacing:.1em;color:var(--ink)">${esc(c.household.invite_code)}</b> — juftingiz shu kod bilan qo'shiladi</div>`}</div></div></div></div>
+        ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Haqiqiy ulashish uchun js/config.js ga Supabase kalitlarini yozing.</p>` : ""}`,
+      foot: `${demo ? `<button class="btn ghost" data-switch><i data-lucide="repeat"></i>${c.partner ? esc(firstName(c.partner)) + " bo'lib kirish" : "Almashish"}</button>` : ""}<button class="btn danger" data-out><i data-lucide="log-out"></i>Chiqish</button>`,
+      onMount(el) {
+        $("[data-out]", el).addEventListener("click", async () => { await Store.signOut(); location.href = "kirish.html"; });
+        const sw = $("[data-switch]", el);
+        if (sw) sw.addEventListener("click", () => { Store.switchUser(); location.reload(); });
+      },
+    });
+  }
+
+  /* ---------- task reminders (runs on every page) ---------- */
+  async function checkReminders() {
+    let tasks;
+    try { tasks = await Store.list("tasks"); } catch (e) { return; }
+    const now = Date.now();
+    for (const t of tasks) {
+      if (t.done || t.reminded || !t.remind_at || new Date(t.remind_at).getTime() > now) continue;
+      if (t.assignee_id && !isMe(t.assignee_id)) continue;
+      toast(`Eslatma: ${t.title}`, "alarm-clock");
+      browserPush({ id: t.id, text: `Eslatma: ${t.title}` });
+      try { await Store.update("tasks", t.id, { reminded: true }); } catch (e) {}
+    }
+  }
+
+  /**
+   * Boot a page: ensure a signed-in household member, render chrome, wire realtime.
+   * opts: { page, title, sub, home, tables, render(ctx) }
+   */
+  async function boot(opts) {
+    let ctx;
+    try { ctx = await Store.session(); } catch (e) { console.error(e); }
+    if (!ctx || !ctx.household) { location.replace("kirish.html"); return; }
+    Store.ctx = ctx;
+
+    const app = $(".app");
+    app.insertAdjacentHTML("afterbegin", topbar(opts));
+    if (Store.mode === "demo") {
+      $(".topbar").insertAdjacentHTML("afterend", `<div class="demo-banner"><i data-lucide="flask-conical"></i><span>Demo: siz <b>${esc(firstName(ctx.profile))}</b></span><button id="demo-switch">${esc(firstName(ctx.partner))} bo'lish</button></div>`);
+      $("#demo-switch").addEventListener("click", () => { Store.switchUser(); location.reload(); });
+    }
+    app.insertAdjacentHTML("beforeend", tabbar(opts.page));
+    $("#bell").addEventListener("click", openNotifications);
+    $("#me-btn").addEventListener("click", openProfile);
+    icons();
+
+    await refreshBell();
+    let pending = null;
+    const rerender = () => { clearTimeout(pending); pending = setTimeout(() => opts.render && opts.render(ctx), 120); };
+    Store.subscribe(Array.from(new Set([...(opts.tables || []), "notifications"])), (table, payload) => {
+      if (table === "notifications" || table === "*") {
+        refreshBell();
+        if (payload && payload.eventType === "INSERT" && payload.new && payload.new.recipient_id === ctx.profile.id) {
+          toast(payload.new.text, MODULE_ICON[payload.new.module] || "bell");
+          browserPush(payload.new);
+        }
+      }
+      if (table === "*" || (opts.tables || []).includes(table)) rerender();
+    });
+    if (opts.render) await opts.render(ctx);
+    icons();
+    checkReminders();
+    setInterval(checkReminders, 60000);
+  }
+
+  window.App = {
+    boot, sheet, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
+    person, nameOf, firstName, isMe, avatar, timeAgo, greeting,
+    ymd, parseYmd, today, addDays, fmtLong, fmtDate, fmtShort,
+    MONTHS, WEEKDAYS, WEEKDAYS_SHORT, logoSvg,
+  };
+})();

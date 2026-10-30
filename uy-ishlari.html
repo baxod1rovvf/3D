@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<title>Uy ishlari — Oila Uchun</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4EEE6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+<style>
+  .filters { display: flex; gap: 6px; margin: 12px 0 2px; }
+  .filters button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: var(--ink-2); min-height: 36px; transition: all var(--t-fast); }
+  .filters button.active { background: var(--ink); border-color: var(--ink); color: #FFF8EF; }
+
+  .task { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; margin-top: 10px; transition: opacity var(--t), transform var(--t); }
+  .task .grow { flex: 1; min-width: 0; cursor: pointer; }
+  .task h4 { margin: 2px 0 0; font-size: 15.5px; font-weight: 600; overflow-wrap: anywhere; }
+  .task .desc { margin: 2px 0 0; font-size: 13.5px; color: var(--ink-2); }
+  .task .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .task .who { display: inline-flex; align-items: center; gap: 5px; }
+  .task.prio-yuqori { box-shadow: inset 3px 0 0 var(--danger), var(--shadow); }
+  .task.prio-orta { box-shadow: inset 3px 0 0 var(--honey), var(--shadow); }
+  .task.done h4 { text-decoration: line-through; color: var(--muted); }
+  .task.done { background: var(--surface-2); box-shadow: none; }
+
+  .check { width: 48px; height: 48px; margin: -9px -6px -9px -10px; border: 0; background: none; display: grid; place-items: center; flex: none; position: relative; }
+  .check .c { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line-2); display: grid; place-items: center; color: transparent; background: #fff; transition: all var(--t) var(--ease); }
+  .check .c svg { width: 16px; height: 16px; stroke-width: 3; }
+  .check:active .c { transform: scale(.88); }
+  .check.on .c { background: var(--sage); border-color: var(--sage); color: #fff; }
+  .check.anim .c { animation: pop 380ms var(--ease); }
+  .burst { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; pointer-events: none; animation: burst 600ms var(--ease) forwards; }
+  @keyframes burst { from { transform: translate(0, 0) scale(1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) scale(.3); opacity: 0; } }
+  @keyframes pop { 0% { transform: scale(.7); } 55% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  .leaving { animation: leave 420ms 520ms var(--ease) forwards; }
+  @keyframes leave { to { opacity: 0; transform: translateY(-6px) scale(.98); } }
+
+  .group-h { margin: 18px 2px 0; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .progress { margin-top: 14px; padding: 14px; display: flex; align-items: center; gap: 14px; }
+  .progress .ring { width: 48px; height: 48px; flex: none; }
+  .progress b { font-family: var(--serif); font-size: 18px; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="main" id="main">
+    <div class="segmented" role="tablist" aria-label="Ishlar">
+      <button role="tab" data-view="today">Bugun <span class="count" id="c-today">0</span></button>
+      <button role="tab" data-view="upcoming">Kelgusi <span class="count" id="c-up">0</span></button>
+      <button role="tab" data-view="done">Bajarilgan</button>
+    </div>
+    <div class="filters" role="group" aria-label="Kimga">
+      <button data-who="all" class="active">Hammasi</button>
+      <button data-who="me">Menga</button>
+      <button data-who="partner" id="f-partner">Juftimga</button>
+    </div>
+    <div id="list"></div>
+  </main>
+  <button class="fab" id="add" aria-label="Ish qo'shish"><i data-lucide="plus"></i></button>
+</div>
+
+<script>
+const { $, $$, esc, icons } = App;
+const PRIO = { yuqori: { name: "Muhim", cls: "urgent" }, orta: { name: "O'rta", cls: "honey" }, past: { name: "Oddiy", cls: "" } };
+const PRIO_ORDER = { yuqori: 0, orta: 1, past: 2 };
+const SUGGEST = ["Uyni tozalash", "Idishlarni yuvish", "Kirlarni yuvish", "Ovqat tayyorlash", "Chiqindilarni tashlash", "Bozorlik qilish"];
+let view = "today", who = "all", tasks = [], loaded = false;
+
+async function render() { tasks = await Store.list("tasks", { order: "created_at", asc: true }); loaded = true; draw(); }
+
+function draw() {
+  if (!loaded) return;
+  const t = App.today();
+  const me = Store.ctx.profile.id;
+  const byWho = (x) => who === "all" || (who === "me" ? x.assignee_id === me : x.assignee_id !== me);
+  const open = tasks.filter((x) => !x.done);
+  const today = open.filter((x) => !x.due_date || x.due_date <= t);
+  const upcoming = open.filter((x) => x.due_date && x.due_date > t);
+  const done = tasks.filter((x) => x.done).sort((a, b) => (a.completed_at < b.completed_at ? 1 : -1));
+  $("#c-today").textContent = today.length;
+  $("#c-up").textContent = upcoming.length;
+  const sort = (a, b) => ((a.due_date || "") > (b.due_date || "") ? 1 : (a.due_date || "") < (b.due_date || "") ? -1 : PRIO_ORDER[a.priority] - PRIO_ORDER[b.priority]);
+
+  let html = "";
+  if (view === "today") {
+    const doneToday = tasks.filter((x) => x.done && x.completed_at && App.ymd(new Date(x.completed_at)) === t).length;
+    const total = today.length + doneToday;
+    if (total) {
+      const pct = total ? doneToday / total : 0;
+      html += `<div class="card progress"><svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--line)" stroke-width="5"/><circle cx="24" cy="24" r="20" fill="none" stroke="var(--sage)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(125.7 * pct).toFixed(1)} 200" transform="rotate(-90 24 24)" style="transition:stroke-dasharray .5s"/></svg>
+        <div><b>${doneToday} / ${total}</b><div class="small muted">${pct === 1 ? "Bugungi ishlar tugadi. Rahmat!" : "bugungi ish bajarildi"}</div></div></div>`;
+    }
+    const list = today.filter(byWho).sort(sort);
+    html += list.length ? list.map(card).join("") : empty(today.length ? "Bu filtrda ish yo'q" : "Bugun bo'sh kun", today.length ? "Boshqa filtrni tanlang." : "Yangi ish qo'shing yoki dam oling.");
+  } else if (view === "upcoming") {
+    const list = upcoming.filter(byWho).sort(sort);
+    let last = null;
+    html += list.length ? list.map((x) => { const h = x.due_date !== last ? `<div class="group-h">${App.fmtShort(x.due_date)}</div>` : ""; last = x.due_date; return h + card(x); }).join("") : empty("Kelgusi ishlar yo'q", "Kelgusi kunlar uchun ish rejalashtiring.");
+  } else {
+    const list = done.filter(byWho).slice(0, 60);
+    html += list.length ? list.map(card).join("") : empty("Hali bajarilgan ish yo'q", "Ishni tugatganingizda doirachani bosing.");
+  }
+  $("#list").innerHTML = html;
+  icons();
+}
+
+function card(x) {
+  const t = App.today();
+  const assignee = App.person(x.assignee_id);
+  const overdue = !x.done && x.due_date && x.due_date < t;
+  const p = PRIO[x.priority] || PRIO.past;
+  return `<div class="card task prio-${x.priority} ${x.done ? "done" : ""}" data-id="${x.id}">
+    <button class="check ${x.done ? "on" : ""}" data-check aria-pressed="${!!x.done}" aria-label="${esc(x.title)}: ${x.done ? "bajarilmagan deb belgilash" : "bajarildi"}"><span class="c"><i data-lucide="check"></i></span></button>
+    <div class="grow" data-edit>
+      <h4>${esc(x.title)}</h4>
+      ${x.description ? `<p class="desc">${esc(x.description)}</p>` : ""}
+      <div class="meta">
+        ${assignee ? `<span class="who">${App.avatar(assignee, "sm")}${App.isMe(assignee.id) ? "Siz" : esc(App.firstName(assignee))}</span>` : ""}
+        ${x.done ? `<span>· ${esc(App.nameOf(x.completed_by))} bajardi, ${App.timeAgo(x.completed_at)}</span>` : `
+          ${x.due_date ? `<span class="chip ${overdue ? "urgent" : ""}"><i data-lucide="calendar"></i>${overdue ? "Kechikdi · " : ""}${App.fmtShort(x.due_date)}</span>` : ""}
+          ${x.priority !== "past" ? `<span class="chip ${p.cls}">${p.name}</span>` : ""}
+          ${x.remind_at && !x.reminded ? `<span class="chip accent" title="Eslatma"><i data-lucide="bell"></i>${new Date(x.remind_at).toTimeString().slice(0, 5)}</span>` : ""}`}
+      </div>
+    </div>
+  </div>`;
+}
+
+function empty(title, text) {
+  return `<div class="empty" style="margin-top:24px"><div class="ico"><i data-lucide="sparkles"></i></div><strong>${title}</strong><p>${text}</p>
+    <button class="btn primary" onclick="openEditor()"><i data-lucide="plus"></i>Ish qo'shish</button></div>`;
+}
+
+function burst(btn) {
+  const colors = ["#6F8466", "#C9963E", "#B8664A", "#6E8A9C"];
+  for (let i = 0; i < 10; i++) {
+    const s = document.createElement("span");
+    const a = (Math.PI * 2 * i) / 10, r = 22 + Math.random() * 10;
+    s.className = "burst"; s.style.background = colors[i % 4];
+    s.style.setProperty("--dx", `${Math.cos(a) * r}px`); s.style.setProperty("--dy", `${Math.sin(a) * r}px`);
+    btn.appendChild(s); setTimeout(() => s.remove(), 650);
+  }
+}
+
+$("#list").addEventListener("click", async (e) => {
+  const cardEl = e.target.closest(".task"); if (!cardEl) return;
+  const x = tasks.find((t) => t.id === cardEl.dataset.id); if (!x) return;
+  if (e.target.closest("[data-check]")) {
+    const btn = e.target.closest("[data-check]");
+    const done = !x.done;
+    btn.classList.toggle("on", done); btn.classList.add("anim");
+    if (done) { if (!matchMedia("(prefers-reduced-motion: reduce)").matches) burst(btn); cardEl.classList.add("done", "leaving"); if (navigator.vibrate) navigator.vibrate([10, 40, 10]); }
+    const patch = done ? { done: true, completed_by: Store.ctx.profile.id, completed_at: new Date().toISOString() } : { done: false, completed_by: null, completed_at: null };
+    try {
+      await Store.update("tasks", x.id, patch);
+      Object.assign(x, patch);
+      if (done) Store.log("tasks", `${App.firstName(Store.ctx.profile)} «${x.title}» ishini bajardi`, "uy-ishlari.html");
+    } catch (err) { App.fail(err); }
+    setTimeout(draw, done ? 950 : 0);
+  } else if (e.target.closest("[data-edit]")) openEditor(x);
+});
+
+function toLocalInput(iso) { if (!iso) return ""; const d = new Date(iso); return `${App.ymd(d)}T${d.toTimeString().slice(0, 5)}`; }
+
+function openEditor(task) {
+  const isNew = !task;
+  const c = Store.ctx;
+  const x = task || { title: "", description: "", assignee_id: c.profile.id, due_date: view === "upcoming" ? App.addDays(App.today(), 1) : App.today(), priority: "orta", remind_at: null };
+  const people = [c.profile, c.partner].filter(Boolean);
+  App.sheet({
+    title: isNew ? "Yangi uy ishi" : "Ishni tahrirlash",
+    body: `<form id="tform" novalidate>
+      <div class="field"><label for="t-title">Ish nomi</label><input class="input" id="t-title" name="title" value="${esc(x.title)}" maxlength="80" autocomplete="off" ${isNew ? "autofocus" : ""}><span class="error-text" hidden id="t-err">Ish nomini yozing</span>
+        ${isNew ? `<div class="hscroll" style="margin-top:4px">${SUGGEST.map((s) => `<button type="button" class="chip" data-s="${esc(s)}" style="padding:6px 10px;white-space:nowrap">${esc(s)}</button>`).join("")}</div>` : ""}</div>
+      <div class="field"><span class="label">Kim bajaradi</span><div class="choice">${people.map((p) => `<label><input type="radio" name="assignee" value="${p.id}" ${p.id === x.assignee_id ? "checked" : ""}><span>${App.avatar(p, "sm")}${App.isMe(p.id) ? "Men" : esc(App.firstName(p))}</span></label>`).join("")}</div></div>
+      <div class="field-row">
+        <div class="field"><label for="t-due">Muddat</label><input class="input" type="date" id="t-due" name="due_date" value="${esc(x.due_date || "")}"></div>
+        <div class="field"><label for="t-rem">Eslatma</label><input class="input" type="datetime-local" id="t-rem" name="remind_at" value="${toLocalInput(x.remind_at)}"></div>
+      </div>
+      <div class="field"><span class="label">Muhimlik</span><div class="choice">${Object.entries(PRIO).reverse().map(([k, v]) => `<label><input type="radio" name="priority" value="${k}" ${k === x.priority ? "checked" : ""}><span>${v.name}</span></label>`).join("")}</div></div>
+      <div class="field"><label for="t-desc">Izoh</label><textarea class="textarea" id="t-desc" name="description" maxlength="300">${esc(x.description)}</textarea></div>
+      ${!isNew && x.created_by ? `<p class="hint">${esc(App.nameOf(x.created_by))} qo'shgan · ${App.timeAgo(x.created_at)}</p>` : ""}
+    </form>`,
+    foot: `${isNew ? `<button class="btn ghost" data-close>Bekor qilish</button>` : `<button class="btn danger" data-del aria-label="Ishni o'chirish"><i data-lucide="trash-2"></i></button>`}<button class="btn primary" data-save>${isNew ? "Qo'shish" : "Saqlash"}</button>`,
+    onMount(el, api) {
+      const f = $("#tform", el);
+      $$("[data-s]", el).forEach((b) => b.addEventListener("click", () => { f.elements.title.value = b.dataset.s; $("#t-err", el).hidden = true; }));
+      f.elements.title.addEventListener("input", () => ($("#t-err", el).hidden = true));
+      $("[data-save]", el).addEventListener("click", async () => {
+        const rem = f.elements.remind_at.value;
+        const v = { title: f.elements.title.value.trim(), description: f.elements.description.value.trim(), assignee_id: f.elements.assignee.value, due_date: f.elements.due_date.value || null, priority: f.elements.priority.value, remind_at: rem ? new Date(rem).toISOString() : null };
+        if (!v.title) { $("#t-err", el).hidden = false; f.elements.title.focus(); return; }
+        if (v.remind_at !== (x.remind_at || null)) v.reminded = false;
+        $("[data-save]", el).disabled = true;
+        try {
+          const meName = App.firstName(c.profile);
+          if (isNew) {
+            await Store.insert("tasks", { ...v, reminded: false, done: false, created_by: c.profile.id });
+            Store.log("tasks", App.isMe(v.assignee_id) ? `${meName} yangi uy ishini oldi: «${v.title}»` : `${meName} sizga yangi ish topshirdi: «${v.title}»`, "uy-ishlari.html");
+            App.toast("Ish qo'shildi");
+          } else {
+            await Store.update("tasks", x.id, v);
+            if (v.assignee_id !== x.assignee_id && !App.isMe(v.assignee_id)) Store.log("tasks", `${meName} sizga «${v.title}» ishini topshirdi`, "uy-ishlari.html");
+            App.toast("Saqlandi");
+          }
+          api.close(); render();
+        } catch (e) { App.fail(e); $("[data-save]", el).disabled = false; }
+      });
+      const del = $("[data-del]", el);
+      if (del) del.addEventListener("click", async () => {
+        api.close();
+        if (!(await App.confirm(`«${x.title}» ishi o'chiriladi.`, "Ishni o'chirish"))) return;
+        try { await Store.remove("tasks", x.id); App.toast("O'chirildi", "trash-2"); render(); } catch (e) { App.fail(e); }
+      });
+    },
+  });
+}
+window.openEditor = openEditor;
+
+$$(".segmented button").forEach((b) => b.addEventListener("click", () => { view = b.dataset.view; $$(".segmented button").forEach((x) => { x.classList.toggle("active", x === b); x.setAttribute("aria-selected", x === b); }); draw(); }));
+$$(".filters button").forEach((b) => b.addEventListener("click", () => { who = b.dataset.who; $$(".filters button").forEach((x) => x.classList.toggle("active", x === b)); draw(); }));
+$(".segmented button").classList.add("active");
+$("#add").addEventListener("click", () => openEditor());
+App.boot({ page: "uy", title: "Uy ishlari", sub: "Birgalikda — yengilroq", tables: ["tasks"], render }).then(() => {
+  if (Store.ctx && Store.ctx.partner) $("#f-partner").textContent = App.firstName(Store.ctx.partner) + "ga";
+  if (new URLSearchParams(location.search).get("new")) openEditor();
+});
+</script>
+</body>
+</html>

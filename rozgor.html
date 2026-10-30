@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<title>Ro'zg'or — Oila Uchun</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4EEE6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+<style>
+  .cat-h { display: flex; align-items: center; gap: 8px; margin: 18px 2px 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .cat-h svg { width: 16px; height: 16px; color: var(--muted); }
+  .cat-h .n { margin-left: auto; font-weight: 500; color: var(--muted); font-size: 12px; }
+
+  .g-row { cursor: default; transition: background var(--t) var(--ease), opacity var(--t); }
+  .g-row .grow { cursor: pointer; }
+  .g-row.need { background: #FCF1EE; }
+  .g-row.need .title { color: var(--danger); }
+  .g-row.bought .title { text-decoration: line-through; color: var(--muted); }
+
+  /* The X toggle — big, one-thumb target */
+  .xbox { width: 48px; height: 48px; margin: -6px -4px -6px -8px; border: 0; background: none; display: grid; place-items: center; flex: none; }
+  .xbox .b {
+    width: 30px; height: 30px; border-radius: 9px;
+    border: 2px solid var(--line-2); background: #fff;
+    display: grid; place-items: center; color: transparent;
+    transition: background var(--t) var(--ease), border-color var(--t), color var(--t), transform var(--t-fast);
+  }
+  .xbox .b svg { width: 18px; height: 18px; stroke-width: 3; }
+  .xbox:active .b { transform: scale(.88); }
+  .xbox.on .b { background: var(--danger); border-color: var(--danger); color: #fff; animation: pop 360ms var(--ease); }
+  .xbox.done .b { background: var(--sage-soft); border-color: transparent; color: var(--sage); }
+
+  .buy { width: 52px; height: 52px; margin: -8px -10px -8px 0; border: 0; background: none; display: grid; place-items: center; flex: none; }
+  .buy .c { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--sage); display: grid; place-items: center; color: transparent; transition: all var(--t) var(--ease); }
+  .buy .c svg { width: 18px; height: 18px; stroke-width: 3; }
+  .buy:active .c { transform: scale(.88); }
+  .buy.on .c { background: var(--sage); color: #fff; animation: pop 360ms var(--ease); }
+  @keyframes pop { 0% { transform: scale(.7); } 55% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+  .leaving { animation: leave 420ms 260ms var(--ease) forwards; }
+  @keyframes leave { to { opacity: 0; transform: translateX(30px); } }
+
+  .qty { font-size: 13px; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); padding: 2px 8px; border-radius: 8px; white-space: nowrap; flex: none; }
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); margin: 12px 2px 0; align-items: center; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -1px; margin-right: 4px; }
+  .bar { display: flex; gap: 8px; margin-top: 14px; }
+  .bar .btn { flex: 1; min-height: 42px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="main" id="main">
+    <div class="segmented" role="tablist" aria-label="Ro'yxat ko'rinishi">
+      <button role="tab" data-view="all">Hammasi</button>
+      <button role="tab" data-view="need">Kerak <span class="count" id="c-need">0</span></button>
+      <button role="tab" data-view="bought">Xarid qilindi <span class="count" id="c-bought">0</span></button>
+    </div>
+    <div id="list"></div>
+  </main>
+  <button class="fab" id="add" aria-label="Mahsulot qo'shish"><i data-lucide="plus"></i></button>
+</div>
+
+<script>
+const { $, $$, esc, icons } = App;
+const CATS = [
+  { id: "sabzavot", name: "Sabzavotlar", icon: "carrot" },
+  { id: "meva", name: "Mevalar", icon: "apple" },
+  { id: "sut", name: "Sut mahsulotlari", icon: "milk" },
+  { id: "gosht", name: "Go'sht mahsulotlari", icon: "beef" },
+  { id: "non", name: "Non va un mahsulotlari", icon: "croissant" },
+  { id: "ichimlik", name: "Ichimliklar", icon: "cup-soda" },
+  { id: "uy", name: "Uy-ro'zg'or buyumlari", icon: "spray-can" },
+  { id: "boshqa", name: "Boshqalar", icon: "package" },
+];
+const catOf = (id) => CATS.find((c) => c.id === id) || CATS[CATS.length - 1];
+
+let view = new URLSearchParams(location.search).get("view") || "all";
+let items = [];
+let loaded = false;
+
+function setView(v) {
+  view = v;
+  $$(".segmented button").forEach((b) => { const on = b.dataset.view === v; b.classList.toggle("active", on); b.setAttribute("aria-selected", on); });
+  draw();
+}
+
+async function render() {
+  items = await Store.list("grocery_items", { order: "created_at", asc: true });
+  loaded = true;
+  draw();
+}
+
+function metaFor(i) {
+  const bits = [];
+  if (i.urgent && i.status === "kerak") bits.push(`<span class="chip urgent"><i data-lucide="flame"></i>Shoshilinch</span>`);
+  if (i.status === "kerak" && i.marked_by) bits.push(`${esc(App.nameOf(i.marked_by))} belgiladi · ${App.timeAgo(i.marked_at)}`);
+  if (i.status === "olindi" && i.purchased_by) bits.push(`${esc(App.nameOf(i.purchased_by))} oldi · ${App.timeAgo(i.purchased_at)}`);
+  if (i.note) bits.push(`<span>${esc(i.note)}</span>`);
+  return bits.length ? `<div class="meta">${bits.join("")}</div>` : "";
+}
+
+function rowAll(i) {
+  const st = i.status;
+  const label = st === "kerak" ? `${i.name}: kerak deb belgilangan. Bekor qilish` : `${i.name}: uyda yo'q deb belgilash`;
+  return `<div class="row g-row ${st === "kerak" ? "need" : st === "olindi" ? "bought" : ""}" data-id="${i.id}">
+    <button class="xbox ${st === "kerak" ? "on" : st === "olindi" ? "done" : ""}" data-x aria-pressed="${st === "kerak"}" aria-label="${esc(label)}">
+      <span class="b"><i data-lucide="${st === "olindi" ? "check" : "x"}"></i></span></button>
+    <div class="grow" data-edit><div class="title">${esc(i.name)}</div>${metaFor(i)}</div>
+    ${i.quantity ? `<span class="qty">${esc(i.quantity)}</span>` : ""}
+  </div>`;
+}
+function rowNeed(i) {
+  return `<div class="row g-row" data-id="${i.id}">
+    <div class="grow" data-edit><div class="title">${esc(i.name)}</div>${metaFor(i)}</div>
+    ${i.quantity ? `<span class="qty">${esc(i.quantity)}</span>` : ""}
+    <button class="buy" data-buy aria-label="${esc(i.name)}: xarid qilindi"><span class="c"><i data-lucide="check"></i></span></button>
+  </div>`;
+}
+function rowBought(i) {
+  return `<div class="row g-row bought" data-id="${i.id}">
+    <div class="grow" data-edit><div class="title">${esc(i.name)}</div>${metaFor(i)}</div>
+    <button class="btn ghost" data-restock style="min-height:36px;padding:0 12px;font-size:13px" aria-label="${esc(i.name)}: uyga joylandi">Joylandi</button>
+  </div>`;
+}
+
+function grouped(list, rowFn) {
+  return CATS.map((c) => {
+    const rows = list.filter((i) => catOf(i.category).id === c.id);
+    if (!rows.length) return "";
+    return `<div class="cat-h"><i data-lucide="${c.icon}"></i>${c.name}<span class="n">${rows.length}</span></div>
+      <div class="card list">${rows.map(rowFn).join("")}</div>`;
+  }).join("");
+}
+
+function draw() {
+  if (!loaded) { $("#list").innerHTML = `<div class="skeleton" style="height:220px;margin-top:18px"></div>`; return; }
+  const need = items.filter((i) => i.status === "kerak").sort((a, b) => (b.urgent - a.urgent) || ((a.marked_at || "") > (b.marked_at || "") ? -1 : 1));
+  const bought = items.filter((i) => i.status === "olindi").sort((a, b) => (a.purchased_at > b.purchased_at ? -1 : 1));
+  $("#c-need").textContent = need.length;
+  $("#c-bought").textContent = bought.length;
+  let html = "";
+  if (view === "all") {
+    html = `<div class="legend"><span><i style="background:var(--danger)"></i>Uyda yo'q — kerak</span><span><i style="background:var(--sage-soft)"></i>Olingan</span>
+      <button class="link-btn" id="history" style="margin-left:auto"><i data-lucide="history" style="width:14px;height:14px;vertical-align:-2px"></i> Tarix</button></div>`;
+    html += items.length ? grouped(items, rowAll) : empty("Ro'yxat bo'sh", "Uyda doim bo'ladigan mahsulotlarni qo'shing. Tugaganida X ni bosasiz.");
+  } else if (view === "need") {
+    html = need.length ? grouped(need, rowNeed) : empty("Hammasi bor", "Hozircha hech narsa olish kerak emas. Mahsulot tugasa, «Hammasi» bo'limida X ni bosing.", "check");
+  } else {
+    html = bought.length ? `<div class="bar"><button class="btn ghost" id="restock-all"><i data-lucide="archive-restore"></i>Hammasi joylandi</button><button class="btn ghost" id="history2"><i data-lucide="history"></i>Xaridlar tarixi</button></div>` + grouped(bought, rowBought)
+      : empty("Xarid qilinganlar yo'q", "Do'kondan olingan mahsulotlar shu yerda ko'rinadi.", "shopping-bag");
+  }
+  $("#list").innerHTML = html;
+  icons();
+  const h = $("#history") || $("#history2"); if (h) h.addEventListener("click", openHistory);
+  const ra = $("#restock-all"); if (ra) ra.addEventListener("click", restockAll);
+}
+
+function empty(title, text, icon = "shopping-basket") {
+  return `<div class="empty" style="margin-top:30px"><div class="ico"><i data-lucide="${icon}"></i></div><strong>${title}</strong><p>${text}</p>
+    ${view === "all" ? `<button class="btn primary" onclick="openEditor()"><i data-lucide="plus"></i>Mahsulot qo'shish</button>` : ""}</div>`;
+}
+
+/* ---------- interactions ---------- */
+$("#list").addEventListener("click", async (e) => {
+  const row = e.target.closest(".g-row"); if (!row) return;
+  const item = items.find((i) => i.id === row.dataset.id); if (!item) return;
+  const me = Store.ctx.profile.id;
+  if (e.target.closest("[data-x]")) {
+    const btn = e.target.closest("[data-x]");
+    const toNeed = item.status !== "kerak";
+    // optimistic UI: instant visual feedback
+    Object.assign(item, toNeed ? { status: "kerak", marked_by: me, marked_at: new Date().toISOString() } : { status: "bor" });
+    btn.classList.toggle("on", toNeed); btn.classList.remove("done");
+    row.classList.toggle("need", toNeed); row.classList.remove("bought");
+    if (navigator.vibrate) navigator.vibrate(12);
+    try {
+      await Store.update("grocery_items", item.id, toNeed
+        ? { status: "kerak", marked_by: me, marked_at: item.marked_at, purchased_by: null, purchased_at: null }
+        : { status: "bor", marked_by: null, marked_at: null });
+      if (toNeed) Store.log("grocery", `${App.firstName(Store.ctx.profile)} «${item.name}»ni kerak deb belgiladi`, "rozgor.html?view=need");
+    } catch (err) { App.fail(err); }
+    draw();
+  } else if (e.target.closest("[data-buy]")) {
+    const btn = e.target.closest("[data-buy]");
+    btn.classList.add("on"); row.classList.add("leaving");
+    if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
+    try {
+      await Store.update("grocery_items", item.id, { status: "olindi", purchased_by: me, purchased_at: new Date().toISOString() });
+      Store.log("grocery", `${App.firstName(Store.ctx.profile)} «${item.name}»ni xarid qildi`, "rozgor.html?view=bought");
+    } catch (err) { App.fail(err); row.classList.remove("leaving"); btn.classList.remove("on"); }
+  } else if (e.target.closest("[data-restock]")) {
+    try { await Store.update("grocery_items", item.id, { status: "bor", marked_by: null, marked_at: null }); } catch (err) { App.fail(err); }
+  } else if (e.target.closest("[data-edit]")) {
+    openEditor(item);
+  }
+});
+
+async function restockAll() {
+  const bought = items.filter((i) => i.status === "olindi");
+  try { await Promise.all(bought.map((i) => Store.update("grocery_items", i.id, { status: "bor", marked_by: null, marked_at: null }))); }
+  catch (e) { return App.fail(e); }
+  App.toast("Xaridlar uyga joylandi", "archive-restore");
+  render();
+}
+
+function openEditor(item) {
+  const isNew = !item;
+  const it = item || { name: "", category: "sabzavot", quantity: "", note: "", urgent: false, status: "kerak" };
+  App.sheet({
+    title: isNew ? "Yangi mahsulot" : "Mahsulotni tahrirlash",
+    body: `<form id="gform" novalidate>
+      <div class="field"><label for="g-name">Nomi</label><input class="input" id="g-name" name="name" value="${esc(it.name)}" autocomplete="off" autofocus required maxlength="60"><span class="error-text" hidden id="g-err">Mahsulot nomini yozing</span></div>
+      <div class="field"><label for="g-cat">Turkum</label><select class="select" id="g-cat" name="category">${CATS.map((c) => `<option value="${c.id}" ${c.id === catOf(it.category).id ? "selected" : ""}>${c.name}</option>`).join("")}</select></div>
+      <div class="field-row">
+        <div class="field"><label for="g-qty">Miqdori</label><input class="input" id="g-qty" name="quantity" value="${esc(it.quantity)}" placeholder="masalan, 2 kg" maxlength="30"></div>
+        <div class="field"><label for="g-note">Izoh</label><input class="input" id="g-note" name="note" value="${esc(it.note)}" maxlength="80"></div>
+      </div>
+      <label class="switch"><span><b style="font-weight:600">Shoshilinch</b><br><span class="hint">Ro'yxat tepasida qizil belgi bilan</span></span><input type="checkbox" name="urgent" ${it.urgent ? "checked" : ""}></label>
+      ${isNew ? `<label class="switch"><span><b style="font-weight:600">Hozir kerak</b><br><span class="hint">O'chirilsa, uyda bor deb saqlanadi</span></span><input type="checkbox" name="needed" checked></label>` : ""}
+      ${!isNew && it.added_by ? `<p class="hint" style="margin-top:12px">${esc(App.nameOf(it.added_by))} qo'shgan${it.purchased_by ? ` · oxirgi marta ${esc(App.nameOf(it.purchased_by))} olgan` : ""}</p>` : ""}
+    </form>`,
+    foot: `${isNew ? `<button class="btn ghost" data-close>Bekor qilish</button>` : `<button class="btn danger" data-del><i data-lucide="trash-2"></i>O'chirish</button>`}<button class="btn primary" data-save>${isNew ? "Qo'shish" : "Saqlash"}</button>`,
+    onMount(el, api) {
+      const f = $("#gform", el);
+      const name = f.elements.name;
+      name.addEventListener("blur", () => { if (!name.value.trim()) $("#g-err", el).hidden = false; });
+      name.addEventListener("input", () => { $("#g-err", el).hidden = true; });
+      const save = async () => {
+        const v = { name: name.value.trim(), category: f.elements.category.value, quantity: f.elements.quantity.value.trim(), note: f.elements.note.value.trim(), urgent: f.elements.urgent.checked };
+        if (!v.name) { $("#g-err", el).hidden = false; name.focus(); return; }
+        const me = Store.ctx.profile.id;
+        $("[data-save]", el).disabled = true;
+        try {
+          if (isNew) {
+            const needed = f.elements.needed.checked;
+            await Store.insert("grocery_items", { ...v, status: needed ? "kerak" : "bor", added_by: me, marked_by: needed ? me : null, marked_at: needed ? new Date().toISOString() : null });
+            Store.log("grocery", needed ? `${App.firstName(Store.ctx.profile)} ro'zg'orga «${v.name}»ni qo'shdi` : `${App.firstName(Store.ctx.profile)} yangi mahsulot qo'shdi: «${v.name}»`, "rozgor.html?view=need");
+            App.toast(`«${v.name}» qo'shildi`);
+          } else {
+            await Store.update("grocery_items", it.id, v);
+            App.toast("Saqlandi");
+          }
+          api.close(); render();
+        } catch (e) { App.fail(e); $("[data-save]", el).disabled = false; }
+      };
+      f.addEventListener("submit", (e) => { e.preventDefault(); save(); });
+      $("[data-save]", el).addEventListener("click", save);
+      const del = $("[data-del]", el);
+      if (del) del.addEventListener("click", async () => {
+        api.close();
+        if (!(await App.confirm(`«${it.name}» ro'yxatdan butunlay o'chiriladi.`, "Mahsulotni o'chirish"))) return;
+        try { await Store.remove("grocery_items", it.id); App.toast("O'chirildi", "trash-2"); render(); } catch (e) { App.fail(e); }
+      });
+    },
+  });
+}
+window.openEditor = openEditor;
+
+async function openHistory() {
+  const acts = (await Store.list("activity", { limit: 200 })).filter((a) => a.module === "grocery");
+  App.sheet({
+    title: "Xaridlar tarixi",
+    body: acts.length ? `<div class="list">${acts.map((a) => `<div class="row" style="padding:10px 0">${App.avatar(App.person(a.actor_id), "sm")}<div class="grow"><div style="font-size:14px">${esc(a.text)}</div><div class="meta">${App.timeAgo(a.created_at)}</div></div></div>`).join("")}</div>`
+      : `<div class="empty"><div class="ico"><i data-lucide="history"></i></div><strong>Tarix bo'sh</strong><p>Belgilangan va olingan mahsulotlar shu yerda yoziladi.</p></div>`,
+  });
+}
+
+$$(".segmented button").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+$("#add").addEventListener("click", () => openEditor());
+setView(view);
+App.boot({ page: "rozgor", title: "Ro'zg'or", sub: "Uyda nima yo'q — darhol ko'rinadi", tables: ["grocery_items"], render }).then(() => {
+  if (new URLSearchParams(location.search).get("new")) openEditor();
+});
+</script>
+</body>
+</html>

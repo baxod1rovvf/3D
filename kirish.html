@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<title>Kirish — Oila Uchun</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4EEE6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+<style>
+  .auth { flex: 1; overflow-y: auto; padding: calc(40px + var(--safe-t)) 22px 28px; display: flex; flex-direction: column; animation: page-in var(--t) var(--ease) both; }
+  .brand { text-align: center; margin-bottom: 26px; }
+  .brand svg { width: 64px; height: 64px; margin: 0 auto 14px; }
+  .brand h1 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 32px; letter-spacing: -.01em; }
+  .brand p { margin: 6px 0 0; color: var(--muted); }
+  .who { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .who button { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 10px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); font-weight: 600; transition: transform var(--t-fast); }
+  .who button:active { transform: scale(.97); }
+  .who .avatar { width: 56px; height: 56px; font-size: 22px; }
+  .foot-note { margin-top: auto; padding-top: 24px; text-align: center; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .foot-note svg { width: 14px; height: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="auth">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="18" fill="#2F2A25"/><path d="M14 36c4 9 12 14 18 14s14-5 18-14" fill="none" stroke="#E8C9A8" stroke-width="3.2" stroke-linecap="round"/><path d="M17 40c5 4 10 5 15 5s10-1 15-5" fill="none" stroke="#B8664A" stroke-width="3.2" stroke-linecap="round"/><circle cx="27" cy="31" r="5.5" fill="#FFF3E6"/><circle cx="37.5" cy="30" r="6.5" fill="#F3DCC4"/></svg>
+      <h1>Oila Uchun</h1>
+      <p>Ikkingiz uchun bitta raqamli uy</p>
+    </div>
+    <div id="view"></div>
+    <div class="foot-note"><i data-lucide="lock"></i>Ma'lumotlaringizni faqat ikkingiz ko'rasiz</div>
+  </div>
+</div>
+
+<script>
+const { $, $$, esc, icons } = App;
+const view = $("#view");
+
+function errText(e) {
+  const m = (e && e.message) || "";
+  if (/Invalid login/i.test(m)) return "Email yoki parol mos kelmadi. Qayta tekshirib ko'ring.";
+  if (/already registered/i.test(m)) return "Bu email bilan hisob bor. «Kirish»ni tanlang.";
+  if (/Password should/i.test(m)) return "Parol kamida 6 belgidan iborat bo'lsin.";
+  if (/household_full/i.test(m)) return "Bu oilada allaqachon ikki a'zo bor.";
+  if (/invalid_code/i.test(m)) return "Bunday taklif kodi topilmadi. Kodni juftingizdan qayta so'rang.";
+  if (/Email not confirmed/i.test(m)) return "Emailingizni tasdiqlang — pochtangizga xat yuborildi.";
+  return "Ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.";
+}
+
+/* ---------- Demo: pick a partner ---------- */
+function demoView() {
+  view.innerHTML = `<p class="small muted" style="text-align:center;margin:0 0 14px">Demo rejim — kim sifatida kirasiz?</p>
+    <div class="who">
+      <button data-role="xotin"><span class="avatar her">M</span>Malika<span class="small muted" style="font-weight:400">Xotin</span></button>
+      <button data-role="er"><span class="avatar him">J</span>Jasur<span class="small muted" style="font-weight:400">Er</span></button>
+    </div>
+    <p class="hint" style="text-align:center;margin-top:18px">Ikkita oynada ikki xil kishi bo'lib kiring — o'zgarishlar darhol ko'rinadi. Haqiqiy foydalanish uchun js/config.js ga Supabase kalitlarini qo'shing.</p>`;
+  $$("[data-role]", view).forEach((b) => b.addEventListener("click", async () => { await Store.signIn(b.dataset.role); location.href = "index.html"; }));
+}
+
+/* ---------- Supabase: sign in / sign up ---------- */
+function authView(mode = "in") {
+  view.innerHTML = `<div class="segmented" style="position:static;margin-bottom:18px">
+      <button data-m="in" class="${mode === "in" ? "active" : ""}">Kirish</button><button data-m="up" class="${mode === "up" ? "active" : ""}">Ro'yxatdan o'tish</button></div>
+    <form id="f" novalidate>
+      ${mode === "up" ? `<div class="field"><label for="a-name">Ismingiz</label><input class="input" id="a-name" name="name" autocomplete="given-name" required maxlength="40"></div>
+        <div class="field"><span class="label">Oiladagi o'rningiz</span><div class="choice">
+          <label><input type="radio" name="role" value="xotin" checked><span>Xotin</span></label><label><input type="radio" name="role" value="er"><span>Er</span></label></div></div>` : ""}
+      <div class="field"><label for="a-email">Email</label><input class="input" id="a-email" name="email" type="email" autocomplete="email" inputmode="email" required></div>
+      <div class="field"><label for="a-pass">Parol</label><input class="input" id="a-pass" name="password" type="password" autocomplete="${mode === "up" ? "new-password" : "current-password"}" minlength="6" required>${mode === "up" ? `<span class="hint">Kamida 6 belgi</span>` : ""}</div>
+      <p class="error-text" id="err" hidden></p>
+      <button class="btn primary block" type="submit">${mode === "up" ? "Hisob yaratish" : "Kirish"}</button>
+    </form>`;
+  $$("[data-m]", view).forEach((b) => b.addEventListener("click", () => authView(b.dataset.m)));
+  const f = $("#f", view);
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = $("#err", view); err.hidden = true;
+    const email = f.elements.email.value.trim(), pass = f.elements.password.value;
+    if (!email || !pass || (mode === "up" && !f.elements.name.value.trim())) { err.textContent = "Barcha maydonlarni to'ldiring."; err.hidden = false; return; }
+    const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
+    try {
+      if (mode === "up") {
+        const r = await Store.signUp(email, pass, f.elements.name.value.trim(), f.elements.role.value);
+        if (r.needsConfirm) { view.innerHTML = `<div class="empty"><div class="ico"><i data-lucide="mail-check"></i></div><strong>Pochtangizni tekshiring</strong><p>${esc(email)} manziliga tasdiqlash xati yubordik. Tasdiqlagach, shu yerga qaytib kiring.</p><button class="btn ghost" onclick="authView('in')">Kirish sahifasiga</button></div>`; icons(); return; }
+      } else await Store.signIn(email, pass);
+      route();
+    } catch (ex) { err.textContent = errText(ex); err.hidden = false; btn.disabled = false; }
+  });
+}
+window.authView = authView;
+
+/* ---------- Household: create or join ---------- */
+function householdView(ctx) {
+  view.innerHTML = `<p style="text-align:center;margin:0 0 16px">Assalomu alaykum, <b>${esc(ctx.profile ? ctx.profile.full_name : "")}</b>! Endi oilangizni bog'laymiz.</p>
+    <div class="card" style="padding:16px">
+      <h3 class="serif" style="margin:0 0 4px;font-weight:500">Yangi oila yaratish</h3><p class="hint" style="margin:0 0 12px">Siz birinchisiz — keyin juftingizga taklif kodini yuborasiz.</p>
+      <div class="field"><label for="h-name">Oila nomi</label><input class="input" id="h-name" value="Bizning uy" maxlength="40"></div>
+      <button class="btn primary block" id="create">Oila yaratish</button>
+    </div>
+    <div class="card" style="padding:16px;margin-top:12px">
+      <h3 class="serif" style="margin:0 0 4px;font-weight:500">Taklif kodi bilan qo'shilish</h3><p class="hint" style="margin:0 0 12px">Juftingiz yuborgan 6 belgili kodni yozing.</p>
+      <div class="field"><label for="h-code">Taklif kodi</label><input class="input" id="h-code" maxlength="6" autocapitalize="characters" style="letter-spacing:.2em;text-transform:uppercase"></div>
+      <button class="btn ghost block" id="join">Qo'shilish</button>
+    </div>
+    <p class="error-text" id="err" hidden style="margin-top:12px"></p>
+    <button class="link-btn" id="out" style="display:block;margin:14px auto 0">Boshqa hisob bilan kirish</button>`;
+  const err = $("#err", view);
+  const run = async (fn, btn) => { err.hidden = true; btn.disabled = true; try { await fn(); location.href = "index.html"; } catch (e) { err.textContent = errText(e); err.hidden = false; btn.disabled = false; } };
+  $("#create", view).addEventListener("click", (e) => run(() => Store.createHousehold($("#h-name", view).value.trim() || "Bizning uy"), e.currentTarget));
+  $("#join", view).addEventListener("click", (e) => { const code = $("#h-code", view).value.trim(); if (code.length < 6) { err.textContent = "Kod 6 belgidan iborat."; err.hidden = false; return; } run(() => Store.joinHousehold(code), e.currentTarget); });
+  $("#out", view).addEventListener("click", async () => { await Store.signOut(); route(); });
+}
+
+async function route() {
+  if (Store.mode === "demo") { demoView(); return icons(); }
+  let ctx = null;
+  try { ctx = await Store.session(); } catch (e) { console.error(e); }
+  if (!ctx) authView("in");
+  else if (!ctx.household) householdView(ctx);
+  else location.replace("index.html");
+  icons();
+}
+route();
+</script>
+</body>
+</html>
