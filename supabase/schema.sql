@@ -220,9 +220,9 @@ alter table public.profiles add column if not exists meal_lead_hours int not nul
 -- Family meal times ("HH:MM") and time zone.
 create table if not exists public.family_settings (
   household_id text primary key references public.households (key) on delete cascade,
-  breakfast text not null default '08:00' check (breakfast ~ '^\d{1,2}:\d{2}$'),
-  lunch text not null default '13:00' check (lunch ~ '^\d{1,2}:\d{2}$'),
-  dinner text not null default '19:00' check (dinner ~ '^\d{1,2}:\d{2}$'),
+  breakfast text not null default '08:00' check (breakfast ~ '^([01]?\d|2[0-3]):[0-5]\d$'),
+  lunch text not null default '13:00' check (lunch ~ '^([01]?\d|2[0-3]):[0-5]\d$'),
+  dinner text not null default '19:00' check (dinner ~ '^([01]?\d|2[0-3]):[0-5]\d$'),
   timezone text default 'Asia/Tashkent'
 );
 
@@ -248,6 +248,22 @@ begin
     execute format('grant select, insert, update, delete on public.%I to anon, authenticated', t);
   end loop;
 end $$;
+
+-- Save this phone's subscription for the caller's family. The endpoint is one phone, so any older
+-- row (even one filed under another family, e.g. after joining a new family) is replaced.
+create or replace function public.save_push_subscription(p_endpoint text, p_profile uuid, p_sub jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare k text := public.family_key();
+begin
+  if coalesce(p_endpoint, '') = '' or p_sub is null then raise exception 'bad_subscription'; end if;
+  if not exists (select 1 from profiles where id = p_profile and household_id = k) then
+    raise exception 'profile_not_in_family';
+  end if;
+  delete from push_subscriptions where endpoint = p_endpoint;
+  insert into push_subscriptions (endpoint, household_id, profile_id, subscription) values (p_endpoint, k, p_profile, p_sub);
+end $$;
+revoke all on function public.save_push_subscription(text, uuid, jsonb) from public;
+grant execute on function public.save_push_subscription(text, uuid, jsonb) to anon, authenticated;
 
 -- Server-only tables (used by the Edge Function with the service role): never visible to the site.
 create table if not exists public.push_keys (

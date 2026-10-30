@@ -266,6 +266,8 @@
         const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
         try {
           const k = await Store.claimPairCode(code);
+          // Remove this phone's push subscription from the old family while its key is still active.
+          if (k) await withTimeout(disablePushQuietly());
           if (!k || !(await Store.joinFamily(k))) { err.textContent = "Kod noto'g'ri yoki eskirgan. Juftingizdan yangi kod so'rang."; err.hidden = false; btn.disabled = false; return; }
           Store.Device.del("oila-me");
           done && done(); onJoined ? onJoined() : (location.href = "kirish.html");

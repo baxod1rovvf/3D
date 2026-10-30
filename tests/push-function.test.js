@@ -92,8 +92,8 @@ test("OPTIONS and GET public_key answer with CORS; keys are created once", async
 
 test("POST notification_id pushes to the recipient's phones and drops gone ones", async () => {
   const tables = {
-    notifications: [{ id: "n1", household_id: HH, recipient_id: HUSB, module: "grocery", type: "grocery_need", title: "T", body: "B", tag: "grocery_need", text: "B", link: "rozgor.html", created_at: new Date().toISOString() },
-      { id: "old", household_id: HH, recipient_id: HUSB, module: "grocery", text: "x", created_at: "2020-01-01T00:00:00Z" }],
+    notifications: [{ id: "aaaaaaaa-0000-4000-8000-000000000001", household_id: HH, recipient_id: HUSB, module: "grocery", type: "grocery_need", title: "T", body: "B", tag: "grocery_need", text: "B", link: "rozgor.html", created_at: new Date().toISOString() },
+      { id: "aaaaaaaa-0000-4000-8000-000000000002", household_id: HH, recipient_id: HUSB, module: "grocery", text: "x", created_at: "2020-01-01T00:00:00Z" }],
     push_subscriptions: [
       { endpoint: "e-husb", household_id: HH, profile_id: HUSB, subscription: { endpoint: "e-husb" } },
       { endpoint: "e-husb-old", household_id: HH, profile_id: HUSB, subscription: { endpoint: "e-husb-old" } },
@@ -102,7 +102,7 @@ test("POST notification_id pushes to the recipient's phones and drops gone ones"
   };
   const f = load(tables);
   f.gone.add("e-husb-old");
-  const r = await f.call("POST", "", { notification_id: "n1" });
+  const r = await f.call("POST", "", { notification_id: "aaaaaaaa-0000-4000-8000-000000000001" });
   assert.deepStrictEqual(await r.json(), { sent: 1 });
   assert.deepStrictEqual(f.sent.map((s) => s.endpoint), ["e-husb"]);
   assert.deepStrictEqual(Object.keys(f.sent[0].payload).sort(), ["body", "tag", "title", "url", "vibrate"]);
@@ -110,9 +110,15 @@ test("POST notification_id pushes to the recipient's phones and drops gone ones"
   assert.strictEqual(f.sent[0].opts.TTL, 3600);
   assert.strictEqual(f.sent[0].opts.vapidDetails.publicKey, "PUB");
   assert.deepStrictEqual(tables.push_subscriptions.map((s) => s.endpoint), ["e-husb", "e-wife"]);
-  assert.deepStrictEqual(await (await f.call("POST", "", { notification_id: "old" })).json(), { sent: 0 });
-  assert.deepStrictEqual(await (await f.call("POST", "", { notification_id: "missing" })).json(), { sent: 0 });
+  assert.deepStrictEqual(await (await f.call("POST", "", { notification_id: "aaaaaaaa-0000-4000-8000-000000000002" })).json(), { sent: 0 });
+  assert.deepStrictEqual(await (await f.call("POST", "", { notification_id: "aaaaaaaa-0000-4000-8000-000000000003" })).json(), { sent: 0 });
   assert.strictEqual((await f.call("POST", "", { nope: 1 })).status, 400);
+  for (const bad of ["n1", "1; drop", 5, null, "' or 1=1"]) {
+    const r = await f.call("POST", "", { notification_id: bad });
+    assert.strictEqual(r.status, 400, String(bad));
+    assert.strictEqual(r.headers.get("Access-Control-Allow-Origin"), "*");
+  }
+  assert.strictEqual((await f.call("POST", "", 5)).status, 400);
 });
 
 test("POST tick claims each reminder once and inserts a notification row", async () => {

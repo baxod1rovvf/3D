@@ -17,6 +17,7 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-family-key",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
@@ -108,7 +109,10 @@ Deno.serve(async (req) => {
     }
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
-      if (body && typeof body.notification_id === "string") return json({ sent: await sendNotificationRow(body.notification_id) });
+      if (body && typeof body === "object" && "notification_id" in body) {
+        if (!UUID.test(String(body.notification_id))) return json({ error: "bad_notification_id" }, 400);
+        return json({ sent: await sendNotificationRow(body.notification_id) });
+      }
       if (body && body.tick === true) return json({ sent: await tick() });
     }
     return json({ error: "bad_request" }, 400);

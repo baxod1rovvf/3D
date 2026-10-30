@@ -302,7 +302,8 @@
       },
       async savePushSubscription(sub) {
         const c = await client();
-        check(await c.from("push_subscriptions").upsert({ endpoint: sub.endpoint, household_id: key(), profile_id: profile.id, subscription: sub }, { onConflict: "endpoint" }));
+        // RPC: moves the endpoint to this family even if another family had it before.
+        check(await c.rpc("save_push_subscription", { p_endpoint: sub.endpoint, p_profile: profile.id, p_sub: sub }));
       },
       async deletePushSubscription(endpoint) {
         const c = await client();

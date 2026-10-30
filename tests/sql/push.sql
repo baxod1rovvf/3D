@@ -140,3 +140,69 @@ do $$ begin
   begin insert into public.push_keys (id, public_key, private_key) values (2, 'p', 'q'); raise exception 'second key row';
   exception when check_violation then null; end;
 end $$;
+
+-- 9. Meal times must be real HH:MM times.
+do $$
+declare bad text;
+begin
+  foreach bad in array array['24:00', '25:00', '19:60', '7:5', 'abc'] loop
+    begin
+      insert into public.family_settings (household_id, dinner) values ('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', bad);
+      raise exception 'time % accepted', bad;
+    exception when check_violation then null;
+    end;
+  end loop;
+  insert into public.family_settings (household_id, breakfast, lunch, dinner) values ('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', '7:05', '23:59', '00:00');
+  delete from public.family_settings where household_id = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+end $$;
+
+-- 10. save_push_subscription moves a phone to the family that saves it (e.g. after joining B by code).
+do $$ begin
+  if (select household_id from public.push_subscriptions where endpoint = 'https://push.example/1') <> 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    then raise exception 'precondition: endpoint 1 should be filed under A'; end if;
+end $$;
+begin;
+set local role anon;
+select set_config('request.headers', '{"x-family-key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}', true);
+select public.save_push_subscription('https://push.example/1', '33333333-3333-3333-3333-333333333333', '{"endpoint":"https://push.example/1","v":3}');
+do $$ begin
+  if (select count(*) from public.push_subscriptions) <> 1 then raise exception 'B does not see the moved subscription'; end if;
+  if (select profile_id from public.push_subscriptions) <> '33333333-3333-3333-3333-333333333333' then raise exception 'wrong profile'; end if;
+  if (select subscription ->> 'v' from public.push_subscriptions) <> '3' then raise exception 'subscription not replaced'; end if;
+  -- a profile from another family is refused
+  begin
+    perform public.save_push_subscription('https://push.example/2', '11111111-1111-1111-1111-111111111111', '{}');
+    raise exception 'foreign profile accepted';
+  exception when raise_exception then
+    if sqlerrm <> 'profile_not_in_family' then raise; end if;
+  end;
+end $$;
+commit;
+begin;
+set local role anon;
+select set_config('request.headers', '{"x-family-key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}', true);
+do $$ begin
+  if (select count(*) from public.push_subscriptions) <> 0 then raise exception 'A still sees the moved subscription'; end if;
+end $$;
+-- saving again under A (same endpoint) moves it back, without an RLS error
+select public.save_push_subscription('https://push.example/1', '11111111-1111-1111-1111-111111111111', '{"endpoint":"https://push.example/1"}');
+do $$ begin
+  if (select count(*) from public.push_subscriptions) <> 1 then raise exception 'A cannot take the endpoint back'; end if;
+end $$;
+commit;
+-- no key at all: refused
+begin;
+set local role anon;
+do $$ begin
+  begin
+    perform public.save_push_subscription('https://push.example/3', '11111111-1111-1111-1111-111111111111', '{}');
+    raise exception 'keyless save accepted';
+  exception when raise_exception then
+    if sqlerrm <> 'profile_not_in_family' then raise; end if;
+  end;
+end $$;
+commit;
+do $$ begin
+  if (select count(*) from public.push_subscriptions where endpoint in ('https://push.example/2', 'https://push.example/3')) <> 0
+    then raise exception 'refused saves left rows'; end if;
+end $$;
