@@ -33,6 +33,8 @@
     me() { return this.get("oila-me"); },
   };
 
+  const SETTINGS_DEFAULTS = { breakfast: "08:00", lunch: "13:00", dinner: "19:00", timezone: null, leadHours: 2 };
+
   function sortRows(rows, opts = {}) {
     const k = opts.order || "created_at";
     rows.sort((a, b) => ((a[k] ?? "") > (b[k] ?? "") ? 1 : (a[k] ?? "") < (b[k] ?? "") ? -1 : 0) * (opts.asc ? 1 : -1));
@@ -133,6 +135,12 @@
         return out;
       },
       async removePhoto(path) { if (path) try { await call(`/photos/${encodeURIComponent(path)}`, { method: "DELETE" }); } catch (e) { console.warn(e); } },
+      async getSettings() { throw new Error("not supported"); },
+      async saveFamilyTimes() { throw new Error("not supported"); },
+      async saveLeadHours() { throw new Error("not supported"); },
+      async pushPublicKey() { return null; },
+      async savePushSubscription() { throw new Error("not supported"); },
+      async deletePushSubscription() { throw new Error("not supported"); },
       _setProfile(p) { profile = p; },
     };
   }
@@ -261,6 +269,45 @@
         return out;
       },
       async removePhoto(id) { if (!id) return; const c = await client(); try { check(await c.from("photos").delete().eq("id", id)); } catch (e) { console.warn(e); } },
+      // Settings tables come from the push migration; until it is run, fall back to defaults.
+      async getSettings() {
+        const out = { ...SETTINGS_DEFAULTS };
+        try {
+          const c = await client();
+          const row = check(await c.from("family_settings").select("breakfast, lunch, dinner, timezone").eq("household_id", key()).maybeSingle());
+          if (row) ["breakfast", "lunch", "dinner", "timezone"].forEach((f) => { if (row[f]) out[f] = row[f]; });
+          if (profile) {
+            const me = check(await c.from("profiles").select("meal_lead_hours").eq("id", profile.id).maybeSingle());
+            if (me && me.meal_lead_hours != null) out.leadHours = me.meal_lead_hours;
+          }
+        } catch (e) { console.warn("settings", e); }
+        return out;
+      },
+      async saveFamilyTimes({ breakfast, lunch, dinner, timezone }) {
+        const c = await client();
+        check(await c.from("family_settings").upsert({ household_id: key(), breakfast, lunch, dinner, timezone }, { onConflict: "household_id" }));
+      },
+      async saveLeadHours(n) {
+        const c = await client();
+        check(await c.from("profiles").update({ meal_lead_hours: n }).eq("id", profile.id));
+        profile.meal_lead_hours = n;
+      },
+      async pushPublicKey() {
+        try {
+          const r = await fetch(`${cfg.SUPABASE_URL}/functions/v1/push?public_key`, { headers: { apikey: cfg.SUPABASE_ANON_KEY } });
+          if (!r.ok) return null;
+          const j = await r.json();
+          return (j && j.publicKey) || null;
+        } catch (e) { return null; }
+      },
+      async savePushSubscription(sub) {
+        const c = await client();
+        check(await c.from("push_subscriptions").upsert({ endpoint: sub.endpoint, household_id: key(), profile_id: profile.id, subscription: sub }, { onConflict: "endpoint" }));
+      },
+      async deletePushSubscription(endpoint) {
+        const c = await client();
+        check(await c.from("push_subscriptions").delete().eq("endpoint", endpoint));
+      },
       _setProfile(p) { profile = p; },
     };
   }
@@ -413,6 +460,21 @@
       },
       async photoUrls(paths) { const o = {}; paths.filter(Boolean).forEach((p) => (o[p] = p)); return o; },
       async removePhoto() {},
+      async getSettings() {
+        const d = read(), f = d.family_settings || {};
+        const me = d.profiles.find((x) => x.id === Device.me());
+        return { ...SETTINGS_DEFAULTS, ...f, leadHours: me && me.meal_lead_hours != null ? me.meal_lead_hours : 2 };
+      },
+      async saveFamilyTimes({ breakfast, lunch, dinner, timezone }) {
+        const d = read(); d.family_settings = { breakfast, lunch, dinner, timezone }; write(d);
+      },
+      async saveLeadHours(n) {
+        const d = read(); const me = d.profiles.find((x) => x.id === Device.me());
+        if (me) me.meal_lead_hours = n; write(d);
+      },
+      async pushPublicKey() { return null; },
+      async savePushSubscription() {},
+      async deletePushSubscription() {},
       _setProfile() {},
     };
   }

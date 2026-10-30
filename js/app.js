@@ -281,16 +281,85 @@
     sheet({ title: "Menda kod bor", body: html, onMount(el, api) { wire(el, () => api.close()); } });
   }
 
+  function installRow() {
+    const st = installState();
+    const row = (ico, title, meta, extra = "") => `<div class="row"><i data-lucide="${ico}"></i><div class="grow"><div class="title">${title}</div><div class="meta">${meta}</div></div>${extra}</div>`;
+    if (st === "installed") return row("circle-check", "\u2705 O'rnatilgan", "Ilova telefoningizda ishlayapti");
+    if (st === "prompt") return row("download", "Telefonga o'rnatish", "Bosh ekranda alohida ilova bo'ladi", `<button class="btn primary" data-install>O'rnatish</button>`);
+    if (st === "ios") return row("share", "Bosh ekranga qo'shing", "1) Pastdagi Ulashish \u2B06\uFE0F tugmasini bosing. 2) \u00ABBosh ekranga qo'shish\u00BB ni tanlang.");
+    return row("info", "O'rnatish", "Brauzer menyusidan \u00ABIlovani o'rnatish\u00BB yoki \u00ABBosh ekranga qo'shish\u00BB ni tanlang.");
+  }
+
+  const urlB64ToBytes = (b64) => {
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  };
+  const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+  /** { state: "unsupported"|"blocked"|"noserver"|"on"|"off", key } for this phone. */
+  async function pushStatus() {
+    if (!pushSupported()) return { state: "unsupported" };
+    let key = null;
+    try { key = await Store.pushPublicKey(); } catch (e) {}
+    if (!key) return { state: "noserver" };
+    if (Notification.permission === "denied") return { state: "blocked" };
+    let sub = null;
+    try { sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription(); } catch (e) {}
+    return { state: sub && Notification.permission === "granted" ? "on" : "off", key };
+  }
+  const PUSH_TEXT = {
+    on: "Yoqilgan: bu telefonga xabarlar keladi.",
+    off: "O'chiq. Yoqsangiz, ilova yopiq bo'lsa ham xabar keladi.",
+    blocked: "Bloklangan. Telefon sozlamalaridan shu sayt uchun bildirishnomalarga ruxsat bering.",
+    noserver: "Server hali sozlanmagan. Bildirishnomalar keyinroq yoqiladi.",
+    unsupported: "Bu brauzer bildirishnomalarni qo'llamaydi",
+  };
+
+  async function enablePush(key) {
+    if ((await Notification.requestPermission()) !== "granted") return false;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(key) }));
+    await Store.savePushSubscription(sub.toJSON());
+    return true;
+  }
+  async function disablePush() {
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (!sub) return;
+    const endpoint = sub.endpoint;
+    await sub.unsubscribe();
+    try { await Store.deletePushSubscription(endpoint); } catch (e) { console.warn(e); }
+  }
+
   function openProfile() {
     const c = Store.ctx;
     const demo = Store.mode === "demo";
+    const leads = [[1, "1 soat"], [2, "2 soat"], [3, "3 soat"], [0, "O'chiq"]];
     sheet({
       title: "Sozlamalar",
       body: `<div class="card list">
           <div class="row">${avatar(c.profile)}<div class="grow"><div class="title">${esc(c.profile.full_name)} <span class="chip">Siz</span></div><div class="meta">${c.profile.role === "er" ? "Er" : "Xotin"}</div></div></div>
           ${c.partner ? `<div class="row">${avatar(c.partner)}<div class="grow"><div class="title">${esc(c.partner.full_name)}</div><div class="meta">${c.partner.role === "er" ? "Er" : "Xotin"}</div></div></div>` : ""}
         </div>
-        <div class="section"><div class="section-head"><h2>Qurilmalar</h2></div>
+        <div class="section"><div class="section-head"><h2>\uD83D\uDCF2 Ilovani o'rnatish</h2></div>
+          <div class="card list" data-install-row>${installRow()}</div></div>
+        <div class="section"><div class="section-head"><h2>\uD83D\uDD14 Bildirishnomalar</h2></div>
+          <div class="card" data-push-row style="padding:14px">
+            <label class="switch"><span class="title">Shu telefonga xabar yuborish</span><input type="checkbox" data-push-switch disabled></label>
+            <p class="hint" data-push-status style="margin:6px 0 12px">Tekshirilmoqda\u2026</p>
+            <button class="btn" data-push-test><i data-lucide="send"></i>Sinab ko'rish</button>
+          </div></div>
+        <div class="section"><div class="section-head"><h2>\uD83C\uDF73 Ovqat vaqtlari</h2></div>
+          <div class="card" style="padding:14px">
+            <div class="field"><label for="set-breakfast">Nonushta</label><input class="input" id="set-breakfast" type="time" data-set-breakfast value="08:00"></div>
+            <div class="field"><label for="set-lunch">Tushlik</label><input class="input" id="set-lunch" type="time" data-set-lunch value="13:00"></div>
+            <div class="field"><label for="set-dinner">Kechki ovqat</label><input class="input" id="set-dinner" type="time" data-set-dinner value="19:00"></div>
+            <p class="hint" style="margin:-6px 0 14px">Bu vaqtlar butun oila uchun umumiy.</p>
+            <div class="field" style="margin-bottom:0"><span class="label" id="lead-label">Qancha oldin eslatilsin?</span>
+              <div class="choice" data-lead role="radiogroup" aria-labelledby="lead-label">${leads.map(([n, t]) => `<label><input type="radio" name="lead" value="${n}"${n === 2 ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
+            </div>
+          </div></div>
+        <div class="section"><div class="section-head"><h2>\uD83D\uDCF1 Qurilmalar</h2></div>
           <div class="card list">
             <button class="row" data-pair-show style="width:100%;border:0;background:none;text-align:left"><i data-lucide="smartphone"></i><div class="grow"><div class="title">Qurilmani ulash</div><div class="meta">Juftingiz telefoni uchun kod olish</div></div><i data-lucide="chevron-right"></i></button>
             <button class="row" data-pair-enter style="width:100%;border:0;background:none;text-align:left"><i data-lucide="keyboard"></i><div class="grow"><div class="title">Menda kod bor</div><div class="meta">Juftingiz bergan kodni kiritish</div></div><i data-lucide="chevron-right"></i></button>
@@ -298,6 +367,54 @@
         ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefon o'rtasida ulashish uchun js/config.js ga Supabase manzili va kalitini yozing.</p>` : ""}`,
       foot: `${c.partner ? `<button class="btn ghost" data-switch><i data-lucide="repeat"></i>Men ${esc(firstName(c.partner))}man</button>` : ""}<button class="btn danger" data-out><i data-lucide="unplug"></i>Uzish</button>`,
       onMount(el, api) {
+        const inst = $("[data-install]", el);
+        if (inst) inst.addEventListener("click", async () => {
+          await install();
+          $("[data-install-row]", el).innerHTML = installRow(); icons();
+        });
+
+        // Notifications for this phone.
+        const pushSw = $("[data-push-switch]", el), status = $("[data-push-status]", el);
+        const refreshPush = async () => {
+          const st = await pushStatus();
+          status.textContent = PUSH_TEXT[st.state];
+          pushSw.checked = st.state === "on";
+          pushSw.disabled = !(st.state === "on" || st.state === "off");
+          pushSw.dataset.key = st.key || "";
+        };
+        refreshPush();
+        pushSw.addEventListener("change", async () => {
+          pushSw.disabled = true;
+          try {
+            if (pushSw.checked) { if (!(await enablePush(pushSw.dataset.key))) toast("Ruxsat berilmadi", "bell-off"); else toast("Bildirishnomalar yoqildi", "bell-ring"); }
+            else { await disablePush(); toast("Bildirishnomalar o'chirildi", "bell-off"); }
+          } catch (e) { fail(e); }
+          refreshPush();
+        });
+        $("[data-push-test]", el).addEventListener("click", async () => {
+          await Store.notify("test", {}, null, { toSelf: true });
+          toast("Sinov xabari yuborildi", "send");
+        });
+
+        // Meal times (family) and reminder lead (this person).
+        const times = {};
+        ["breakfast", "lunch", "dinner"].forEach((k) => { times[k] = $(`[data-set-${k}]`, el); });
+        Store.getSettings().then((s) => {
+          Object.keys(times).forEach((k) => { if (s[k]) times[k].value = s[k]; });
+          const r = $(`[data-lead] input[value="${s.leadHours}"]`, el); if (r) r.checked = true;
+        }).catch(() => {});
+        const saveTimes = async () => {
+          const v = {};
+          Object.keys(times).forEach((k) => { v[k] = times[k].value; });
+          if (!v.breakfast || !v.lunch || !v.dinner) return;
+          let tz = null; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+          try { await Store.saveFamilyTimes({ ...v, timezone: tz }); toast("Vaqtlar saqlandi", "clock"); } catch (e) { fail(e); }
+        };
+        Object.values(times).forEach((inp) => inp.addEventListener("change", saveTimes));
+        $$("[data-lead] input", el).forEach((r) => r.addEventListener("change", async () => {
+          try { await Store.saveLeadHours(Number(r.value)); toast("Eslatma saqlandi", "bell-ring"); } catch (e) { fail(e); }
+        }));
+
         $("[data-pair-show]", el).addEventListener("click", () => { api.close(); setTimeout(() => showPairCode(), 300); });
         $("[data-pair-enter]", el).addEventListener("click", () => { api.close(); setTimeout(() => enterPairCode(), 300); });
         $("[data-out]", el).addEventListener("click", async () => {

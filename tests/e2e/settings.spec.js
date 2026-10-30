@@ -1,0 +1,93 @@
+// E2E (demo mode, headless): settings (install, notifications, meal times). Run: node tests/e2e/settings.spec.js
+const assert = require("node:assert");
+const { chromium } = require("playwright");
+
+const BASE = process.env.BASE || "http://localhost:8765";
+const LUCIDE = process.env.LUCIDE_PATH || "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42/scratchpad/vendor/package/dist/umd/lucide.min.js";
+const SHOT = "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42/scratchpad/settings.png";
+
+(async () => {
+  const browser = await chromium.launch();
+  const errors = [];
+  const ctx = await browser.newContext({ viewport: { width: 375, height: 760 } });
+  await ctx.route("**/js/config.js", (r) => r.fulfill({ contentType: "application/javascript", body: "window.OILA_CONFIG={};" }));
+  await ctx.route("**/unpkg.com/lucide**", (r) => r.fulfill({ contentType: "application/javascript", path: LUCIDE }));
+  await ctx.route("**/fonts.googleapis.com/**", (r) => r.fulfill({ contentType: "text/css", body: "" }));
+  await ctx.route(/supabase|workers\.dev/, (r) => { errors.push("external call " + r.request().url()); r.abort(); });
+  const track = (p) => { p.on("pageerror", (e) => errors.push("pageerror: " + e.message)); return p; };
+
+  const page = track(await ctx.newPage());
+  await page.goto(BASE + "/kirish.html");
+  await page.fill("#w-name", "Malika");
+  await page.fill("#h-name", "Jasur");
+  await page.click("button[type=submit]");
+  await page.click("#next");
+  await page.waitForSelector(".who button");
+  await page.click('.who button[data-id="u-xotin"]');
+  await page.waitForURL("**/index.html");
+  await page.waitForFunction(() => window.Store && Store.ctx);
+
+  // Defaults.
+  const def = await page.evaluate(() => Store.getSettings());
+  assert.deepStrictEqual([def.breakfast, def.lunch, def.dinner, def.leadHours], ["08:00", "13:00", "19:00", 2]);
+
+  // Open settings; sections in order.
+  await page.click("#settings-btn");
+  await page.waitForSelector("[data-set-dinner]");
+  const heads = await page.$$eval(".sheet h2, .sheet .section-head", (els) => els.map((e) => e.textContent.trim()));
+  const order = ["Ilovani o'rnatish", "Bildirishnomalar", "Ovqat vaqtlari", "Qurilmalar"].map((t) => heads.findIndex((h) => h.includes(t)));
+  assert.ok(order.every((i) => i >= 0) && order.every((v, i) => i === 0 || v > order[i - 1]), "section order " + order + " " + heads);
+
+  // Install row shows one of the four states.
+  const inst = await page.textContent("[data-install-row]");
+  assert.ok(/O'rnatilgan|O'rnatish|Ulashish|Bosh ekran|qo'llab|brauzer/i.test(inst), "install row: " + inst);
+
+  // Notifications row (demo: no server).
+  const notif = await page.textContent("[data-push-row]");
+  assert.ok(/server|sozlanmagan/i.test(notif), "push status: " + notif);
+
+  // Test button creates a self notification of type "test".
+  const before = await page.evaluate(async () => (await Store.list("notifications")).length);
+  await page.click("[data-push-test]");
+  await page.waitForFunction(async (n) => (await Store.list("notifications")).length > n, before);
+  const last = await page.evaluate(async () => (await Store.list("notifications"))[0]);
+  assert.strictEqual(last.type, "test");
+  assert.strictEqual(last.recipient_id, "u-xotin");
+
+  // Meal times + lead.
+  await page.fill("[data-set-dinner]", "20:30");
+  await page.dispatchEvent("[data-set-dinner]", "change");
+  await page.click('[data-lead] input[value="3"] + span');
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: SHOT });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth || (document.querySelector(".sheet").scrollWidth > document.querySelector(".sheet").clientWidth));
+  assert.ok(!overflow, "horizontal overflow");
+  await page.reload();
+  await page.waitForFunction(() => window.Store && Store.ctx);
+  const s = await page.evaluate(() => Store.getSettings());
+  assert.strictEqual(s.dinner, "20:30");
+  assert.strictEqual(s.leadHours, 3);
+  assert.ok(s.timezone, "timezone saved");
+  await page.click("#settings-btn");
+  await page.waitForSelector("[data-set-dinner]");
+  assert.strictEqual(await page.inputValue("[data-set-dinner]"), "20:30");
+  assert.strictEqual(await page.isChecked('[data-lead] input[value="3"]'), true);
+
+  // Off.
+  await page.click('[data-lead] input[value="0"] + span');
+  await page.waitForTimeout(200);
+  assert.strictEqual((await page.evaluate(() => Store.getSettings())).leadHours, 0);
+
+  // No PushManager.
+  const p2 = track(await ctx.newPage());
+  await p2.addInitScript(() => { delete window.PushManager; });
+  await p2.goto(BASE + "/index.html");
+  await p2.waitForFunction(() => window.Store && Store.ctx);
+  await p2.click("#settings-btn");
+  await p2.waitForSelector("[data-push-row]");
+  assert.ok((await p2.textContent("[data-push-row]")).includes("Bu brauzer bildirishnomalarni qo'llamaydi"));
+
+  await browser.close();
+  assert.deepStrictEqual(errors, []);
+  console.log("settings.spec OK");
+})().catch((e) => { console.error(e); process.exit(1); });
