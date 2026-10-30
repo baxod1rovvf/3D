@@ -228,7 +228,7 @@
         <div class="section"><div class="section-head"><h2>Oila</h2></div>
           <div class="card list"><div class="row"><i data-lucide="home"></i><div class="grow"><div class="title">${esc(c.household.name)}</div>
           ${c.partner ? `<div class="meta">2 / 2 a'zo</div>` : `<div class="meta">Taklif kodi: <b style="letter-spacing:.1em;color:var(--ink)">${esc(c.household.invite_code)}</b> — juftingiz shu kod bilan qo'shiladi</div>`}</div></div></div></div>
-        ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Haqiqiy ulashish uchun js/config.js ga Supabase kalitlarini yozing.</p>` : ""}`,
+        ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Haqiqiy ulashish uchun js/config.js ga InstantDB App ID ni yozing.</p>` : ""}`,
       foot: `${demo ? `<button class="btn ghost" data-switch><i data-lucide="repeat"></i>${c.partner ? esc(firstName(c.partner)) + " bo'lib kirish" : "Almashish"}</button>` : ""}<button class="btn danger" data-out><i data-lucide="log-out"></i>Chiqish</button>`,
       onMount(el) {
         $("[data-out]", el).addEventListener("click", async () => { await Store.signOut(); location.href = "kirish.html"; });

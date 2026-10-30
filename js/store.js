@@ -1,10 +1,12 @@
 /* Oila Uchun — data layer.
- * Supabase is the real backend (auth, Postgres + RLS, realtime, storage).
+ * Real backends: InstantDB (free, recommended) or Supabase — chosen by js/config.js.
+ * Both give auth, per-household permissions, realtime sync and photo storage.
  * When js/config.js has no keys, a local demo backend with the same API is used
  * so the app can be previewed; two tabs sync via BroadcastChannel to imitate both partners.
  */
 (function () {
   const cfg = window.OILA_CONFIG || {};
+  const HAS_INSTANT = !!cfg.INSTANT_APP_ID;
   const HAS_SUPABASE = !!(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY);
   const TABLES = ["grocery_items", "meals", "memories", "tasks", "notifications", "activity"];
 
@@ -110,6 +112,156 @@
         return out;
       },
       async removePhoto(path) { if (!path) return; const c = await client(); await c.storage.from(cfg.PHOTO_BUCKET).remove([path]); },
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* InstantDB backend (free plan: auth, realtime, storage, permissions) */
+  /* ------------------------------------------------------------------ */
+  function instantBackend() {
+    let db, user, profile, partner, household;
+    const hid = () => household && household.id;
+    const scopeKey = (table) => (table === "notifications" ? "recipient_id" : "household_id");
+    const scopeVal = (table) => (table === "notifications" ? profile.id : hid());
+
+    async function client() {
+      if (db) return db;
+      if (!window.instant) await loadScript("https://cdn.jsdelivr.net/npm/@instantdb/core@1.0.67/dist/standalone/index.umd.cjs");
+      db = window.instant.init({ appId: cfg.INSTANT_APP_ID });
+      return db;
+    }
+    async function q(query, opts) { const c = await client(); return (await c.queryOnce(query, opts)).data; }
+    const inviteCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
+    // Instant rejects undefined values; keep nulls (they clear a field).
+    const clean = (o) => JSON.parse(JSON.stringify(o, (k, v) => (v === undefined ? null : v)));
+    function sortRows(rows, opts = {}) {
+      const k = opts.order || "created_at";
+      rows.sort((a, b) => ((a[k] ?? "") > (b[k] ?? "") ? 1 : (a[k] ?? "") < (b[k] ?? "") ? -1 : 0) * (opts.asc ? 1 : -1));
+      return opts.limit ? rows.slice(0, opts.limit) : rows;
+    }
+
+    return {
+      mode: "instant",
+      passwordless: true,
+      async session() {
+        const c = await client();
+        user = await c.getAuth();
+        if (!user) return null;
+        const data = await q({ profiles: { $: { where: { id: user.id } } }, households: {} });
+        profile = data.profiles[0] || null;
+        // Only households this user is a member of are visible (see instant.perms.ts).
+        household = data.households[0] || null;
+        if (!profile || !household) return { user, profile, partner: null, household: null };
+        if (profile.household_id !== household.id) {
+          await c.transact(c.tx.profiles[user.id].update({ household_id: household.id }));
+          profile.household_id = household.id;
+        }
+        const members = (await q({ profiles: { $: { where: { household_id: household.id } } } })).profiles;
+        partner = members.find((m) => m.id !== user.id) || null;
+        return { user, profile, partner, household };
+      },
+      async sendCode(email) { const c = await client(); await c.auth.sendMagicCode({ email }); },
+      async verifyCode(email, code) { const c = await client(); await c.auth.signInWithMagicCode({ email, code }); },
+      async saveProfile(full_name, role) {
+        const c = await client();
+        const u = await c.getAuth();
+        await c.transact(c.tx.profiles[u.id].update({ full_name, role, created_at: nowIso() }));
+      },
+      async signIn() { throw new Error("Use sendCode / verifyCode"); },
+      async signUp() { throw new Error("Use sendCode / verifyCode"); },
+      async signOut() { const c = await client(); await c.auth.signOut(); },
+      async createHousehold(name) {
+        const c = await client();
+        const u = await c.getAuth();
+        const id = window.instant.id(), code = inviteCode();
+        await c.transact(c.tx.households[id].update({ name, invite_code: code, created_at: nowIso() }));
+        // Joining goes through the same invite-code rule as the partner (max two members).
+        await c.transact([
+          c.tx.households[id].ruleParams({ code }).link({ members: u.id }),
+          c.tx.profiles[u.id].update({ household_id: id }),
+        ]);
+      },
+      async joinHousehold(raw) {
+        const c = await client();
+        const u = await c.getAuth();
+        const code = raw.trim().toUpperCase();
+        const h = (await q({ households: { $: { where: { invite_code: code } } } }, { ruleParams: { code } })).households[0];
+        if (!h) throw new Error("invalid_code");
+        try {
+          await c.transact([
+            c.tx.households[h.id].ruleParams({ code }).link({ members: u.id }),
+            c.tx.profiles[u.id].update({ household_id: h.id }),
+          ]);
+        } catch (e) { throw new Error("household_full"); }  // the only rule that can refuse a valid code
+      },
+
+      async list(table, opts = {}) {
+        const data = await q({ [table]: { $: { where: { [scopeKey(table)]: scopeVal(table) } } } });
+        return sortRows(data[table], opts);
+      },
+      async insert(table, row) {
+        const c = await client();
+        const full = clean({ created_at: nowIso(), ...row, household_id: hid() });
+        const id = window.instant.id();
+        await c.transact(c.tx[table][id].update(full));
+        return { id, ...full };
+      },
+      async insertMany(table, rows) {
+        const c = await client();
+        const out = rows.map((r) => ({ id: window.instant.id(), ...clean({ created_at: nowIso(), ...r, household_id: hid() }) }));
+        await c.transact(out.map(({ id, ...r }) => c.tx[table][id].update(r)));
+        return out;
+      },
+      async update(table, id, patch) {
+        const c = await client();
+        const p = clean(patch);
+        delete p.household_id;
+        await c.transact(c.tx[table][id].update(p));
+        return { id, ...p };
+      },
+      async updateWhere(table, match, patch) {
+        const c = await client();
+        const rows = (await this.list(table)).filter((r) => Object.keys(match).every((k) => r[k] === match[k]));
+        if (rows.length) await c.transact(rows.map((r) => c.tx[table][r.id].update(clean(patch))));
+      },
+      async remove(table, id) { const c = await client(); await c.transact(c.tx[table][id].delete()); },
+
+      subscribe(tables, cb) {
+        // Instant pushes whole query results; diff ids so callers still see INSERTs.
+        const unsubs = tables.map((t) => {
+          let known = null;
+          return db.subscribeQuery({ [t]: { $: { where: { [scopeKey(t)]: scopeVal(t) } } } }, (resp) => {
+            if (resp.error || !resp.data) return;
+            const rows = resp.data[t];
+            if (known) {
+              rows.filter((r) => !known.has(r.id)).forEach((r) => cb(t, { eventType: "INSERT", new: r }));
+              cb(t, { eventType: "UPDATE", new: {} });
+            }
+            known = new Set(rows.map((r) => r.id));
+          });
+        });
+        return () => unsubs.forEach((u) => u());
+      },
+
+      async uploadPhoto(blob) {
+        const c = await client();
+        const path = `${hid()}/${window.instant.id()}.jpg`;
+        await c.storage.uploadFile(path, blob, { contentType: "image/jpeg" });
+        return path;
+      },
+      async photoUrls(paths) {
+        const list = paths.filter(Boolean);
+        if (!list.length) return {};
+        const files = (await q({ $files: { $: { where: { path: { $in: list } } } } })).$files;
+        const out = {};
+        files.forEach((f) => { out[f.path] = f.url; });
+        return out;
+      },
+      async removePhoto(path) {
+        if (!path) return;
+        const c = await client();
+        try { await c.transact(c.tx.$files[window.instant.lookup("path", path)].delete()); } catch (e) { console.warn(e); }
+      },
     };
   }
 
@@ -257,7 +409,7 @@
     };
   }
 
-  const backend = HAS_SUPABASE ? supabaseBackend() : demoBackend();
+  const backend = HAS_INSTANT ? instantBackend() : HAS_SUPABASE ? supabaseBackend() : demoBackend();
 
   /* ------------------------------------------------------------------ */
   /* Shared helpers on top of the backend                                */
