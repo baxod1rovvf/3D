@@ -151,7 +151,7 @@
     if (!notifCache.length) return `<div class="empty"><div class="ico"><i data-lucide="bell"></i></div><strong>Hozircha bildirishnoma yo'q</strong><p>Juftingiz biror narsa qo'shsa yoki bajarsa, shu yerda ko'rinadi.</p></div>`;
     return notifCache.map((n) => `<a class="notif ${n.read ? "" : "unread"}" href="${esc(n.link || "#")}" data-id="${n.id}">
         <span class="n-ico"><i data-lucide="${MODULE_ICON[n.module] || "bell"}"></i></span>
-        <span class="n-text">${esc(n.text)}<div class="n-time">${timeAgo(n.created_at)}</div></span></a>`).join("");
+        <span class="n-text">${n.title ? `<b style="display:block;font-size:12px">${esc(n.title)}</b>${esc(n.body || n.text)}` : esc(n.text)}<div class="n-time">${timeAgo(n.created_at)}</div></span></a>`).join("");
   }
   function openNotifications() {
     const hasUnread = notifCache.some((n) => !n.read);

@@ -14,6 +14,9 @@
 <link rel="stylesheet" href="css/app.css">
 <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/stickers.js"></script>
+<script src="js/messages.js"></script>
+<script src="js/reminders.js"></script>
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 <style>
@@ -180,7 +183,7 @@ function openEditor(mem) {
           if (blob) { v.photo_path = await Store.uploadPhoto(blob); if (!isNew && m.photo_path) Store.removePhoto(m.photo_path); }
           if (isNew) {
             await Store.insert("memories", { ...v, photo_path: v.photo_path || null, created_by: Store.ctx.profile.id });
-            Store.log("memories", `${App.firstName(Store.ctx.profile)} yangi xotira saqladi: «${v.title}»`, "xotiralar.html");
+            Store.notify("memory_added", { memory: v.title }, "xotiralar.html");
             App.toast("Xotira saqlandi", "heart");
           } else {
             await Store.update("memories", m.id, v);

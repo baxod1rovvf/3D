@@ -14,6 +14,9 @@
 <link rel="stylesheet" href="css/app.css">
 <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/stickers.js"></script>
+<script src="js/messages.js"></script>
+<script src="js/reminders.js"></script>
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 <style>
@@ -187,7 +190,7 @@ $("#list").addEventListener("click", async (e) => {
       await Store.update("grocery_items", item.id, toNeed
         ? { status: "kerak", marked_by: me, marked_at: item.marked_at, purchased_by: null, purchased_at: null }
         : { status: "bor", marked_by: null, marked_at: null });
-      if (toNeed) Store.log("grocery", `${App.firstName(Store.ctx.profile)} «${item.name}»ni kerak deb belgiladi`, "rozgor.html?view=need");
+      if (toNeed) Store.notify("grocery_need", { item: item.name }, "rozgor.html?view=need");
     } catch (err) { App.fail(err); }
     draw();
   } else if (e.target.closest("[data-buy]")) {
@@ -196,7 +199,7 @@ $("#list").addEventListener("click", async (e) => {
     if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
     try {
       await Store.update("grocery_items", item.id, { status: "olindi", purchased_by: me, purchased_at: new Date().toISOString() });
-      Store.log("grocery", `${App.firstName(Store.ctx.profile)} «${item.name}»ni xarid qildi`, "rozgor.html?view=bought");
+      Store.notify("grocery_bought", { item: item.name }, "rozgor.html?view=bought");
     } catch (err) { App.fail(err); row.classList.remove("leaving"); btn.classList.remove("on"); }
   } else if (e.target.closest("[data-restock]")) {
     try { await Store.update("grocery_items", item.id, { status: "bor", marked_by: null, marked_at: null }); } catch (err) { App.fail(err); }
@@ -244,7 +247,7 @@ function openEditor(item) {
           if (isNew) {
             const needed = f.elements.needed.checked;
             await Store.insert("grocery_items", { ...v, status: needed ? "kerak" : "bor", added_by: me, marked_by: needed ? me : null, marked_at: needed ? new Date().toISOString() : null });
-            Store.log("grocery", needed ? `${App.firstName(Store.ctx.profile)} ro'zg'orga «${v.name}»ni qo'shdi` : `${App.firstName(Store.ctx.profile)} yangi mahsulot qo'shdi: «${v.name}»`, "rozgor.html?view=need");
+            if (needed) Store.notify("grocery_need", { item: v.name }, "rozgor.html?view=need");
             App.toast(`«${v.name}» qo'shildi`);
           } else {
             await Store.update("grocery_items", it.id, v);

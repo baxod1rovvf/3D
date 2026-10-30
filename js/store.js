@@ -209,13 +209,13 @@
       },
       async insert(table, row) {
         const c = await client();
-        const r = check(await c.from(table).insert({ ...row, household_id: key() }).select().single());
+        const r = check(await c.from(table).insert({ ...dbRow(table, row), household_id: key() }).select().single());
         announce(table, { eventType: "INSERT", new: r });
         return r;
       },
       async insertMany(table, rows) {
         const c = await client();
-        const out = check(await c.from(table).insert(rows.map((r) => ({ ...r, household_id: key() }))).select());
+        const out = check(await c.from(table).insert(rows.map((r) => ({ ...dbRow(table, r), household_id: key() }))).select());
         announce(table, { eventType: "UPDATE", new: {} });
         return out;
       },
@@ -268,6 +268,13 @@
   /* ------------------------------------------------------------------ */
   /* Demo backend (preview only, data stays in this browser)             */
   /* ------------------------------------------------------------------ */
+  // Supabase schema (until Task 8) has no type/title/body/tag columns: send only known notification fields.
+  function dbRow(table, row) {
+    if (table !== "notifications") return row;
+    const { recipient_id, actor_id, module, text, link, read } = row;
+    return { recipient_id, actor_id, module, text, link, read };
+  }
+
   function demoBackend() {
     const KEY = "oila-demo-db-v2";
     const bc = "BroadcastChannel" in window ? new BroadcastChannel("oila-demo") : null;
@@ -445,13 +452,16 @@
     /** Disconnect this phone (the family's data stays). */
     forgetDevice() { Device.del("oila-family-key"); Device.del("oila-me"); },
 
-    /** Record an activity and notify the partner (never the actor). */
-    async log(module, text, link) {
+    /** Record an activity and send a typed, playful notification to the partner (or self with opts.toSelf). */
+    async notify(type, data, link, opts) {
       const c = Store.ctx;
       if (!c) return;
-      const jobs = [Store.insert("activity", { actor_id: c.profile.id, module, text })];
-      if (c.partner) jobs.push(Store.insert("notifications", { recipient_id: c.partner.id, actor_id: c.profile.id, module, text, link: link || null, read: false }));
-      try { await Promise.all(jobs); } catch (e) { console.warn("log failed", e); }
+      const m = globalThis.Messages.build(type, { actorRole: c.profile.role, ...(data || {}) });
+      const module = type === "test" ? "test" : type.startsWith("grocery") ? "grocery" : type.startsWith("task") ? "tasks" : type.startsWith("meal") ? "meals" : "memories";
+      const jobs = [Store.insert("activity", { actor_id: c.profile.id, module, text: m.fixed })];
+      const to = opts && opts.toSelf ? c.profile : c.partner;
+      if (to) jobs.push(Store.insert("notifications", { recipient_id: to.id, actor_id: c.profile.id, module, type, title: m.title, body: m.body, tag: m.tag, text: m.body, link: link || null, read: false }));
+      try { await Promise.all(jobs); } catch (e) { console.warn("notify failed", e); }
     },
 
     /** Resize an image file to a JPEG blob (keeps uploads small and fast). */

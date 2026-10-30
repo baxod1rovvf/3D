@@ -14,6 +14,9 @@
 <link rel="stylesheet" href="css/app.css">
 <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/stickers.js"></script>
+<script src="js/messages.js"></script>
+<script src="js/reminders.js"></script>
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 <style>
@@ -162,7 +165,15 @@ $("#list").addEventListener("click", async (e) => {
     try {
       await Store.update("tasks", x.id, patch);
       Object.assign(x, patch);
-      if (done) Store.log("tasks", `${App.firstName(Store.ctx.profile)} «${x.title}» ishini bajardi`, "uy-ishlari.html");
+      if (done) {
+        Store.notify("task_done", { task: x.title }, "uy-ishlari.html");
+        const t = App.today(), me = Store.ctx.profile.id;
+        const mine = tasks.filter((y) => y.assignee_id === me);
+        if (!mine.some((y) => !y.done && (!y.due_date || y.due_date <= t))) {
+          const titles = mine.filter((y) => y.done && y.completed_at && App.ymd(new Date(y.completed_at)) === t).map((y) => y.title);
+          Store.notify("tasks_all_done", { tasks: titles }, "uy-ishlari.html");
+        }
+      }
     } catch (err) { App.fail(err); }
     setTimeout(draw, done ? 950 : 0);
   } else if (e.target.closest("[data-edit]")) openEditor(x);
@@ -201,14 +212,13 @@ function openEditor(task) {
         if (v.remind_at !== (x.remind_at || null)) v.reminded = false;
         $("[data-save]", el).disabled = true;
         try {
-          const meName = App.firstName(c.profile);
           if (isNew) {
             await Store.insert("tasks", { ...v, reminded: false, done: false, created_by: c.profile.id });
-            Store.log("tasks", App.isMe(v.assignee_id) ? `${meName} yangi uy ishini oldi: «${v.title}»` : `${meName} sizga yangi ish topshirdi: «${v.title}»`, "uy-ishlari.html");
+            if (!App.isMe(v.assignee_id)) Store.notify("task_assigned", { task: v.title }, "uy-ishlari.html");
             App.toast("Ish qo'shildi");
           } else {
             await Store.update("tasks", x.id, v);
-            if (v.assignee_id !== x.assignee_id && !App.isMe(v.assignee_id)) Store.log("tasks", `${meName} sizga «${v.title}» ishini topshirdi`, "uy-ishlari.html");
+            if (v.assignee_id !== x.assignee_id && !App.isMe(v.assignee_id)) Store.notify("task_assigned", { task: v.title }, "uy-ishlari.html");
             App.toast("Saqlandi");
           }
           api.close(); render();
