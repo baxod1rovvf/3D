@@ -26,12 +26,32 @@ Shared code is in `css/app.css`, `js/app.js` (shell, tab bar, sheets, notificati
 ## Setup with Supabase (free, one time)
 
 1. In [supabase.com](https://supabase.com), create a new project. The free plan is enough.
-2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, and press **Run**.
-3. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into `js/config.js` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
-4. Host the site folder as static files. GitHub Pages, Netlify or Cloudflare Pages are all free.
-5. On the first phone, open the site, enter both names, and tap **Oilani boshlash**. A 6-digit code appears. On the partner's phone, open the site, tap **Menda kod bor**, and type it in. You can get a new code any time in **Sozlamalar → Qurilmani ulash**.
+2. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into `js/config.js` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+3. Host the site folder as static files (GitHub Pages, Netlify or Cloudflare Pages are all free).
 
-If you already ran `schema.sql` before pairing codes were added, run it again. It's safe to re-run, and it adds the pairing functions.
+### 1. Run the SQL (also after every update)
+
+Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, and press **Run**. It is safe to re-run. It adds the notification columns, the settings tables, pairing, the push trigger and the 5-minute meal timer. Supabase may ask to enable the `pg_net` and `pg_cron` extensions. The SQL enables them itself. If it says they are unavailable, enable them in **Database → Extensions** and run it again.
+
+### 2. Deploy the push function
+
+1. Open **Edge Functions → Deploy a new function → Via Editor**.
+2. Name it `push` and paste the whole of `supabase/functions/push/index.ts`.
+3. Turn **OFF** "Verify JWT" (Enforce JWT verification), then press **Deploy**.
+4. Check: opening `https://<your-project>.supabase.co/functions/v1/push?public_key` in a browser shows `{"publicKey":"..."}`.
+
+### 3. On each phone
+
+1. Install the app: **⚙ Sozlamalar → 📲 Ilovani o'rnatish**. On iPhone use Share → **Bosh ekranga qo'shish**, then open the app from the home-screen icon. Push on iPhone needs iOS 16.4 or newer.
+2. Open **⚙ → 🔔 Bildirishnomalar**, turn it on, and press **Sinab ko'rish** to get a test notification.
+
+### 4. Meal times
+
+In **⚙ → 🍳 Ovqat vaqtlari** set breakfast, lunch and dinner times (shared by the family). Each person picks **Qancha oldin eslatilsin?** (0–3 hours before) for their own phone.
+
+### 5. Pair the phones
+
+On the first phone, open the site, enter both names, and tap **Oilani boshlash**. A 6-digit code appears. On the partner's phone, tap **Menda kod bor** and type it in. You can get a new code any time in **Sozlamalar → Qurilmani ulash**.
 
 Changes reach the other phone right away through Supabase Realtime broadcast. Memory photos are compressed and saved in the `photos` table, so no Storage bucket is needed. The free plan's 500 MB database holds a couple of thousand photos.
 
@@ -45,23 +65,42 @@ Note: Supabase pauses free projects after about a week with no use. A family tha
 
 ## Alternative: Cloudflare Worker + D1
 
-If you'd rather not use Supabase, `cloudflare/worker.js` provides the same backend on Cloudflare's free plan:
+If you'd rather not use Supabase, `cloudflare/worker.js` provides the same backend on Cloudflare's free plan, **without phone push notifications** (the in-app notification centre still works):
 1. Create a D1 database named `oila`.
 2. Create a Worker, paste the file into it, and deploy.
 3. Add a D1 binding named `DB` that points to `oila`.
 4. Put the Worker address into `API_URL` in `js/config.js`, and leave the Supabase fields empty.
 
-## Notifications
+## Features and notifications
 
-Every action writes an activity entry and a notification for the partner. These show live in the in-app notification centre (bell, unread count, mark as read).
+- Playful design with emoji stickers on grocery items, and an installable app (PWA).
+- Every action writes an activity entry and a notification for the partner, in both directions (husband to wife and wife to husband), with a playful message and a hint such as "bring it on your way home". They show in the in-app bell (unread count, mark as read) and, with Supabase push set up, as phone notifications even when the site is closed.
 
-**Phone notifications (push), even when the site is closed.** One time, after running `schema.sql`:
-1. In Supabase open **Edge Functions → Deploy a new function → Via Editor**, name it `push`, paste the whole of `supabase/functions/push/index.ts`, turn **Verify JWT** off, and deploy.
-2. On each phone, open **Sozlamalar** and turn notifications on (on iPhone, add the site to the Home Screen first).
+| Emoji | When |
+|---|---|
+| 🛒 | Something ran out (Ro'zg'or) |
+| 🛍️ | Something was bought |
+| ✨ | A household task was done |
+| 💐 | All of today's tasks are done |
+| 📋 | A task was assigned to you |
+| 🍽️ | A meal was added to the menu |
+| 📸 | A memory was added |
+| 🍳 | Meal reminder (time per meal, 0–3 hours before) |
 
-Each new notification row is sent to the recipient's phones. Every 5 minutes, `pg_cron` asks the function for meal reminders (the time per meal is in Sozlamalar; each person chooses 0–3 hours before). The function makes its own push keys on first use and keeps them in `push_keys`, which the site can't read.
+Custom vibration patterns work on Android only. iPhone ignores them.
 
-To change the function, edit `supabase/functions/push/template.ts` or `js/messages.js`, `js/reminders.js`, `js/push-logic.js`, then run `node tools/build-push.mjs` to regenerate `index.ts`.
+The function creates its own push keys on first use and keeps them in `push_keys`, which the site can't read. To change it, edit `supabase/functions/push/template.ts` or `js/messages.js`, `js/reminders.js`, `js/push-logic.js`, then run `node tools/build-push.mjs` and paste the regenerated `index.ts` again.
+
+## Running the tests
+
+```
+node --test tests/*.test.js          # unit tests
+node tools/build-push.mjs --check    # index.ts is up to date
+bash tests/sql/run.sh                # SQL tests (needs a local PostgreSQL 16 on port 5499, socket /tmp/oila-pgtest)
+python3 -m http.server 8765 &        # then run each tests/e2e/*.spec.js with node
+```
+
+The e2e specs use Playwright and read the path of `lucide.min.js` from the `LUCIDE_PATH` env var.
 
 ## Demo mode
 
