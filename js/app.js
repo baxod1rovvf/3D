@@ -216,24 +216,39 @@
         <span class="pill"><i data-lucide="${t.icon}"></i></span><span>${t.label}</span></a>`).join("")}</nav>`;
   }
 
+  /** Copy or share the private family link that connects the partner's phone. */
+  async function shareFamilyLink() {
+    const link = Store.familyLink();
+    if (navigator.share) {
+      try { await navigator.share({ title: "Oila Uchun", text: "Oilamiz sahifasi — shu havolani oching:", url: link }); return; } catch (e) { if (e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(link); toast("Havola nusxalandi. Juftingizga yuboring.", "copy"); }
+    catch (e) { prompt("Havolani nusxalang:", link); }
+  }
+
   function openProfile() {
     const c = Store.ctx;
     const demo = Store.mode === "demo";
     sheet({
-      title: "Profil",
+      title: "Oila",
       body: `<div class="card list">
           <div class="row">${avatar(c.profile)}<div class="grow"><div class="title">${esc(c.profile.full_name)} <span class="chip">Siz</span></div><div class="meta">${c.profile.role === "er" ? "Er" : "Xotin"}</div></div></div>
           ${c.partner ? `<div class="row">${avatar(c.partner)}<div class="grow"><div class="title">${esc(c.partner.full_name)}</div><div class="meta">${c.partner.role === "er" ? "Er" : "Xotin"}</div></div></div>` : ""}
         </div>
-        <div class="section"><div class="section-head"><h2>Oila</h2></div>
-          <div class="card list"><div class="row"><i data-lucide="home"></i><div class="grow"><div class="title">${esc(c.household.name)}</div>
-          ${c.partner ? `<div class="meta">2 / 2 a'zo</div>` : `<div class="meta">Taklif kodi: <b style="letter-spacing:.1em;color:var(--ink)">${esc(c.household.invite_code)}</b> — juftingiz shu kod bilan qo'shiladi</div>`}</div></div></div></div>
-        ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Haqiqiy ulashish uchun js/config.js ga InstantDB App ID ni yozing.</p>` : ""}`,
-      foot: `${demo ? `<button class="btn ghost" data-switch><i data-lucide="repeat"></i>${c.partner ? esc(firstName(c.partner)) + " bo'lib kirish" : "Almashish"}</button>` : ""}<button class="btn danger" data-out><i data-lucide="log-out"></i>Chiqish</button>`,
-      onMount(el) {
-        $("[data-out]", el).addEventListener("click", async () => { await Store.signOut(); location.href = "kirish.html"; });
+        <div class="section"><div class="section-head"><h2>${esc(c.household.name)}</h2></div>
+          <button class="btn ghost block" data-share><i data-lucide="link"></i>Oila havolasini yuborish</button>
+          <p class="hint" style="margin:8px 2px 0">Ikkinchi telefonni ulash uchun shu havolani juftingizga yuboring. Havolani boshqa hech kimga bermang — u oilangiz sahifasining kaliti.</p></div>
+        ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefon o'rtasida ulashish uchun js/config.js ga InstantDB App ID ni yozing.</p>` : ""}`,
+      foot: `${c.partner ? `<button class="btn ghost" data-switch><i data-lucide="repeat"></i>Men ${esc(firstName(c.partner))}man</button>` : ""}<button class="btn danger" data-out><i data-lucide="unplug"></i>Uzish</button>`,
+      onMount(el, api) {
+        $("[data-share]", el).addEventListener("click", shareFamilyLink);
+        $("[data-out]", el).addEventListener("click", async () => {
+          api.close();
+          if (!(await confirmSheet("Bu telefon oiladan uziladi. Ma'lumotlar o'chmaydi — havola orqali qayta ulanish mumkin.", "Telefonni uzish"))) return;
+          Store.forgetDevice(); location.href = "kirish.html";
+        });
         const sw = $("[data-switch]", el);
-        if (sw) sw.addEventListener("click", () => { Store.switchUser(); location.reload(); });
+        if (sw) sw.addEventListener("click", () => { Store.chooseMe(c.partner.id); location.reload(); });
       },
     });
   }
@@ -253,20 +268,25 @@
   }
 
   /**
-   * Boot a page: ensure a signed-in household member, render chrome, wire realtime.
+   * Boot a page: ensure this phone knows its family and person, render chrome, wire realtime.
    * opts: { page, title, sub, home, tables, render(ctx) }
    */
   async function boot(opts) {
     let ctx;
-    try { ctx = await Store.session(); } catch (e) { console.error(e); }
-    if (!ctx || !ctx.household) { location.replace("kirish.html"); return; }
+    try { ctx = await Store.session(); }
+    catch (e) {
+      console.error(e);
+      $(".app").innerHTML = `<div class="empty" style="margin:auto"><div class="ico"><i data-lucide="wifi-off"></i></div><strong>Ulanib bo'lmadi</strong><p>Internetni tekshirib, qayta urinib ko'ring.</p><button class="btn primary" onclick="location.reload()">Qayta urinish</button></div>`;
+      return icons();
+    }
+    if (!ctx || !ctx.profile) { location.replace("kirish.html"); return; }
     Store.ctx = ctx;
 
     const app = $(".app");
     app.insertAdjacentHTML("afterbegin", topbar(opts));
     if (Store.mode === "demo") {
       $(".topbar").insertAdjacentHTML("afterend", `<div class="demo-banner"><i data-lucide="flask-conical"></i><span>Demo: siz <b>${esc(firstName(ctx.profile))}</b></span><button id="demo-switch">${esc(firstName(ctx.partner))} bo'lish</button></div>`);
-      $("#demo-switch").addEventListener("click", () => { Store.switchUser(); location.reload(); });
+      $("#demo-switch").addEventListener("click", () => { Store.chooseMe(ctx.partner.id); location.reload(); });
     }
     app.insertAdjacentHTML("beforeend", tabbar(opts.page));
     $("#bell").addEventListener("click", openNotifications);
@@ -293,7 +313,7 @@
   }
 
   window.App = {
-    boot, sheet, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
+    boot, sheet, shareFamilyLink, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
     person, nameOf, firstName, isMe, avatar, timeAgo, greeting,
     ymd, parseYmd, today, addDays, fmtLong, fmtDate, fmtShort,
     MONTHS, WEEKDAYS, WEEKDAYS_SHORT, logoSvg,

@@ -1,15 +1,15 @@
-// Oila Uchun — InstantDB permissions. Only the two household members can see household data.
+// Oila Uchun — InstantDB permissions. There are no accounts: the app sends the family's
+// secret key with every read and write (ruleParams.key), and a record is only reachable
+// when its household_id equals that key. Without the family link, nothing can be read.
 import type { InstantRules } from "@instantdb/core";
 
-// Household ids the signed-in user belongs to (households.members link).
-const MY_HOUSEHOLDS = "auth.ref('$user.households.id')";
-const member = {
-  bind: ["isMember", `auth.id != null && data.household_id in ${MY_HOUSEHOLDS}`],
+const HAS_KEY = "ruleParams.key == data.household_id";
+const family = {
   allow: {
-    view: "isMember",
-    create: "isMember",
-    update: "isMember && newData.household_id == data.household_id",
-    delete: "isMember",
+    view: HAS_KEY,
+    create: HAS_KEY,
+    update: `${HAS_KEY} && newData.household_id == data.household_id`,
+    delete: HAS_KEY,
   },
 };
 
@@ -18,61 +18,30 @@ const rules = {
   $default: { allow: { $default: "false" } },
   attrs: { allow: { create: "false" } },
 
+  // A household's id is the key itself.
   households: {
-    bind: [
-      "isMember", "auth.id != null && auth.id in data.ref('members.id')",
-      // Knowing the invite code lets you see and join a household that still has room (max 2).
-      "hasCode", "auth.id != null && ruleParams.code == data.invite_code",
-    ],
     allow: {
-      view: "isMember || hasCode",
-      create: "auth.id != null",
-      update: "isMember || (hasCode && size(data.ref('members.id')) < 2)",
+      view: "ruleParams.key == data.id",
+      create: "ruleParams.key == data.id",
+      update: "ruleParams.key == data.id",
       delete: "false",
     },
   },
+  profiles: { allow: { ...family.allow, delete: "false" } },
+  grocery_items: family,
+  meals: family,
+  memories: family,
+  tasks: family,
+  activity: family,
+  notifications: family,
 
-  profiles: {
-    allow: {
-      view: `auth.id == data.id || (data.household_id != null && data.household_id in ${MY_HOUSEHOLDS})`,
-      create: "auth.id == data.id",
-      update: "auth.id == data.id",
-      delete: "false",
-    },
-  },
-
-  grocery_items: member,
-  meals: member,
-  memories: member,
-  tasks: member,
-
-  activity: {
-    bind: ["isMember", `auth.id != null && data.household_id in ${MY_HOUSEHOLDS}`],
-    allow: {
-      view: "isMember",
-      create: "isMember && data.actor_id == auth.id",
-      update: "false",
-      delete: "false",
-    },
-  },
-
-  // You read only your own notifications, and may only notify your partner — never yourself.
-  notifications: {
-    allow: {
-      view: "auth.id == data.recipient_id",
-      update: "auth.id == data.recipient_id",
-      delete: "auth.id == data.recipient_id",
-      create: `auth.id != null && data.actor_id == auth.id && data.recipient_id != auth.id && data.household_id in ${MY_HOUSEHOLDS}`,
-    },
-  },
-
-  // Photos live under "<household_id>/..." and are visible only to that household.
+  // Photos are stored under "<family key>/<random id>.jpg". Uploads cannot carry rule
+  // parameters, so creating is open; seeing or deleting a photo needs the key.
   $files: {
-    bind: ["inMyHousehold", `auth.id != null && ${MY_HOUSEHOLDS}.exists(h, data.path.startsWith(h + '/'))`],
     allow: {
-      view: "inMyHousehold",
-      create: "inMyHousehold",
-      delete: "inMyHousehold",
+      view: "data.path.startsWith(ruleParams.key + '/')",
+      create: "true",
+      delete: "data.path.startsWith(ruleParams.key + '/')",
     },
   },
 } satisfies InstantRules;

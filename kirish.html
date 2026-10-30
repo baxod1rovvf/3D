@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="uz">
 <head>
-<title>Kirish — Oila Uchun</title>
+<title>Xush kelibsiz — Oila Uchun</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F4EEE6">
@@ -46,154 +46,102 @@
 <script>
 const { $, $$, esc, icons } = App;
 const view = $("#view");
+const OFFLINE = "Ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.";
 
-function errText(e) {
-  const m = (e && e.message) || "";
-  if (/Invalid login/i.test(m)) return "Email yoki parol mos kelmadi. Qayta tekshirib ko'ring.";
-  if (/already registered/i.test(m)) return "Bu email bilan hisob bor. «Kirish»ni tanlang.";
-  if (/Password should/i.test(m)) return "Parol kamida 6 belgidan iborat bo'lsin.";
-  if (/household_full/i.test(m)) return "Bu oilada allaqachon ikki a'zo bor.";
-  if (/invalid_code/i.test(m)) return "Bunday taklif kodi topilmadi. Kodni juftingizdan qayta so'rang.";
-  if (/code|record-not-found|expired/i.test(m) && !/invite/i.test(m)) return "Kod noto'g'ri yoki eskirgan. Yangi kod so'rang.";
-  if (/Email not confirmed/i.test(m)) return "Emailingizni tasdiqlang — pochtangizga xat yuborildi.";
-  return "Ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.";
-}
-
-/* ---------- Demo: pick a partner ---------- */
-function demoView() {
-  view.innerHTML = `<p class="small muted" style="text-align:center;margin:0 0 14px">Demo rejim — kim sifatida kirasiz?</p>
-    <div class="who">
-      <button data-role="xotin"><span class="avatar her">M</span>Malika<span class="small muted" style="font-weight:400">Xotin</span></button>
-      <button data-role="er"><span class="avatar him">J</span>Jasur<span class="small muted" style="font-weight:400">Er</span></button>
-    </div>
-    <p class="hint" style="text-align:center;margin-top:18px">Ikkita oynada ikki xil kishi bo'lib kiring — o'zgarishlar darhol ko'rinadi. Haqiqiy foydalanish uchun js/config.js ga InstantDB App ID ni yozing.</p>`;
-  $$("[data-role]", view).forEach((b) => b.addEventListener("click", async () => { await Store.signIn(b.dataset.role); location.href = "index.html"; }));
-}
-
-/* ---------- Supabase: sign in / sign up ---------- */
-function authView(mode = "in") {
-  view.innerHTML = `<div class="segmented" style="position:static;margin-bottom:18px">
-      <button data-m="in" class="${mode === "in" ? "active" : ""}">Kirish</button><button data-m="up" class="${mode === "up" ? "active" : ""}">Ro'yxatdan o'tish</button></div>
-    <form id="f" novalidate>
-      ${mode === "up" ? `<div class="field"><label for="a-name">Ismingiz</label><input class="input" id="a-name" name="name" autocomplete="given-name" required maxlength="40"></div>
-        <div class="field"><span class="label">Oiladagi o'rningiz</span><div class="choice">
-          <label><input type="radio" name="role" value="xotin" checked><span>Xotin</span></label><label><input type="radio" name="role" value="er"><span>Er</span></label></div></div>` : ""}
-      <div class="field"><label for="a-email">Email</label><input class="input" id="a-email" name="email" type="email" autocomplete="email" inputmode="email" required></div>
-      <div class="field"><label for="a-pass">Parol</label><input class="input" id="a-pass" name="password" type="password" autocomplete="${mode === "up" ? "new-password" : "current-password"}" minlength="6" required>${mode === "up" ? `<span class="hint">Kamida 6 belgi</span>` : ""}</div>
+/* ---------- First phone: set up the family ---------- */
+function setupView() {
+  view.innerHTML = `<form id="f" novalidate>
+      <div class="field"><label for="w-name">Xotinning ismi</label><input class="input" id="w-name" name="wife" autocomplete="off" maxlength="30" required></div>
+      <div class="field"><label for="h-name">Erning ismi</label><input class="input" id="h-name" name="husband" autocomplete="off" maxlength="30" required></div>
+      <div class="field"><label for="f-name">Oila nomi</label><input class="input" id="f-name" name="family" value="Bizning uy" maxlength="40"></div>
       <p class="error-text" id="err" hidden></p>
-      <button class="btn primary block" type="submit">${mode === "up" ? "Hisob yaratish" : "Kirish"}</button>
-    </form>`;
-  $$("[data-m]", view).forEach((b) => b.addEventListener("click", () => authView(b.dataset.m)));
-  const f = $("#f", view);
+      <button class="btn primary block" type="submit">Oilani boshlash</button>
+    </form>
+    <button class="link-btn" id="have-link" style="display:block;margin:16px auto 0">Menda oila havolasi bor</button>`;
+  const f = $("#f", view), err = $("#err", view);
+  $("#have-link", view).addEventListener("click", linkView);
   f.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const err = $("#err", view); err.hidden = true;
-    const email = f.elements.email.value.trim(), pass = f.elements.password.value;
-    if (!email || !pass || (mode === "up" && !f.elements.name.value.trim())) { err.textContent = "Barcha maydonlarni to'ldiring."; err.hidden = false; return; }
+    e.preventDefault(); err.hidden = true;
+    const wifeName = f.elements.wife.value.trim(), husbandName = f.elements.husband.value.trim();
+    if (!wifeName || !husbandName) { err.textContent = "Ikkalangizning ismingizni yozing."; err.hidden = false; return; }
+    const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
+    try { await Store.createFamily({ wifeName, husbandName, familyName: f.elements.family.value.trim() || "Bizning uy" }); shareView(); }
+    catch (ex) { console.error(ex); err.textContent = OFFLINE; err.hidden = false; btn.disabled = false; }
+  });
+}
+
+/* ---------- After setup: send the link to the partner ---------- */
+function shareView() {
+  view.innerHTML = `<div class="card" style="padding:16px;text-align:center">
+      <div class="empty" style="padding:4px 0 0"><div class="ico" style="background:var(--sage-soft);color:var(--sage);border:0"><i data-lucide="check"></i></div>
+      <strong>Oila tayyor!</strong><p>Endi juftingizga oila havolasini yuboring. U havolani o'z telefonida bir marta ochadi — shu bilan tamom.</p></div>
+      <button class="btn accent block" id="share"><i data-lucide="send"></i>Havolani yuborish</button>
+      <p class="hint" style="margin:10px 0 0">Havolani faqat juftingizga bering — u oilangiz sahifasining kaliti.</p>
+    </div>
+    <button class="btn ghost block" id="next" style="margin-top:12px">Davom etish</button>`;
+  $("#share", view).addEventListener("click", App.shareFamilyLink);
+  $("#next", view).addEventListener("click", () => route());
+  icons();
+}
+
+/* ---------- Second phone without the link at hand: paste it ---------- */
+function linkView() {
+  view.innerHTML = `<form id="f" novalidate>
+      <div class="field"><label for="l-link">Oila havolasi</label><input class="input" id="l-link" name="link" autocomplete="off" inputmode="url" required>
+        <span class="hint">Juftingiz yuborgan havolani shu yerga qo'ying.</span></div>
+      <p class="error-text" id="err" hidden></p>
+      <button class="btn primary block" type="submit">Ulanish</button>
+    </form>
+    <button class="link-btn" id="back" style="display:block;margin:16px auto 0">Yangi oila boshlash</button>`;
+  const f = $("#f", view), err = $("#err", view);
+  $("#back", view).addEventListener("click", setupView);
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault(); err.hidden = true;
+    const raw = f.elements.link.value.trim();
+    const key = (raw.match(/#k=([\w-]+)/) || [])[1] || raw;
+    if (!key) { err.textContent = "Havolani qo'ying."; err.hidden = false; return; }
     const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
     try {
-      if (mode === "up") {
-        const r = await Store.signUp(email, pass, f.elements.name.value.trim(), f.elements.role.value);
-        if (r.needsConfirm) { view.innerHTML = `<div class="empty"><div class="ico"><i data-lucide="mail-check"></i></div><strong>Pochtangizni tekshiring</strong><p>${esc(email)} manziliga tasdiqlash xati yubordik. Tasdiqlagach, shu yerga qaytib kiring.</p><button class="btn ghost" onclick="authView('in')">Kirish sahifasiga</button></div>`; icons(); return; }
-      } else await Store.signIn(email, pass);
-      route();
-    } catch (ex) { err.textContent = errText(ex); err.hidden = false; btn.disabled = false; }
-  });
-}
-window.authView = authView;
-
-/* ---------- InstantDB: passwordless email code ---------- */
-function codeView(email = "") {
-  view.innerHTML = `<form id="f" novalidate>
-      <div class="field"><label for="a-email">Email</label><input class="input" id="a-email" name="email" type="email" autocomplete="email" inputmode="email" value="${esc(email)}" required>
-        <span class="hint">Parol kerak emas — pochtangizga 6 xonali kod yuboramiz.</span></div>
-      <p class="error-text" id="err" hidden></p>
-      <button class="btn primary block" type="submit">Kod yuborish</button>
-    </form>`;
-  const f = $("#f", view), err = $("#err", view);
-  f.addEventListener("submit", async (e) => {
-    e.preventDefault(); err.hidden = true;
-    const email = f.elements.email.value.trim();
-    if (!/^\S+@\S+\.\S+$/.test(email)) { err.textContent = "Email manzilini to'liq yozing, masalan: ism@gmail.com"; err.hidden = false; return; }
-    const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
-    try { await Store.sendCode(email); verifyView(email); }
-    catch (ex) { err.textContent = errText(ex); err.hidden = false; btn.disabled = false; }
+      if (await Store.joinFamily(key)) return route();
+      err.textContent = "Bu havola bilan oila topilmadi. Juftingizdan havolani qayta so'rang.";
+    } catch (ex) { console.error(ex); err.textContent = OFFLINE; }
+    err.hidden = false; btn.disabled = false;
   });
 }
 
-function verifyView(email) {
-  view.innerHTML = `<form id="f" novalidate>
-      <p style="margin:0 0 14px;text-align:center"><b>${esc(email)}</b> manziliga kod yubordik.</p>
-      <div class="field"><label for="a-code">Tasdiqlash kodi</label><input class="input" id="a-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="letter-spacing:.3em;text-align:center;font-size:20px" required autofocus></div>
-      <p class="error-text" id="err" hidden></p>
-      <button class="btn primary block" type="submit">Kirish</button>
-      <button class="link-btn" type="button" id="back" style="display:block;margin:12px auto 0">Boshqa email</button>
-    </form>`;
-  const f = $("#f", view), err = $("#err", view);
-  $("#a-code", view).focus();
-  $("#back", view).addEventListener("click", () => codeView(email));
-  f.addEventListener("submit", async (e) => {
-    e.preventDefault(); err.hidden = true;
-    const code = f.elements.code.value.trim();
-    if (code.length < 6) { err.textContent = "Kod 6 ta raqamdan iborat."; err.hidden = false; return; }
-    const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
-    try { await Store.verifyCode(email, code); route(); }
-    catch (ex) { err.textContent = errText(ex); err.hidden = false; btn.disabled = false; }
-  });
-}
-
-function profileView() {
-  view.innerHTML = `<form id="f" novalidate>
-      <p style="margin:0 0 14px;text-align:center">Xush kelibsiz! Keling, tanishib olaylik.</p>
-      <div class="field"><label for="a-name">Ismingiz</label><input class="input" id="a-name" name="name" autocomplete="given-name" maxlength="40" required></div>
-      <div class="field"><span class="label">Oiladagi o'rningiz</span><div class="choice">
-        <label><input type="radio" name="role" value="xotin" checked><span>Xotin</span></label><label><input type="radio" name="role" value="er"><span>Er</span></label></div></div>
-      <p class="error-text" id="err" hidden></p>
-      <button class="btn primary block" type="submit">Davom etish</button>
-    </form>`;
-  const f = $("#f", view), err = $("#err", view);
-  f.addEventListener("submit", async (e) => {
-    e.preventDefault(); err.hidden = true;
-    const name = f.elements.name.value.trim();
-    if (!name) { err.textContent = "Ismingizni yozing."; err.hidden = false; return; }
-    const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
-    try { await Store.saveProfile(name, f.elements.role.value); route(); }
-    catch (ex) { err.textContent = errText(ex); err.hidden = false; btn.disabled = false; }
-  });
-}
-
-/* ---------- Household: create or join ---------- */
-function householdView(ctx) {
-  view.innerHTML = `<p style="text-align:center;margin:0 0 16px">Assalomu alaykum, <b>${esc(ctx.profile ? ctx.profile.full_name : "")}</b>! Endi oilangizni bog'laymiz.</p>
-    <div class="card" style="padding:16px">
-      <h3 class="serif" style="margin:0 0 4px;font-weight:500">Yangi oila yaratish</h3><p class="hint" style="margin:0 0 12px">Siz birinchisiz — keyin juftingizga taklif kodini yuborasiz.</p>
-      <div class="field"><label for="h-name">Oila nomi</label><input class="input" id="h-name" value="Bizning uy" maxlength="40"></div>
-      <button class="btn primary block" id="create">Oila yaratish</button>
-    </div>
-    <div class="card" style="padding:16px;margin-top:12px">
-      <h3 class="serif" style="margin:0 0 4px;font-weight:500">Taklif kodi bilan qo'shilish</h3><p class="hint" style="margin:0 0 12px">Juftingiz yuborgan 6 belgili kodni yozing.</p>
-      <div class="field"><label for="h-code">Taklif kodi</label><input class="input" id="h-code" maxlength="6" autocapitalize="characters" style="letter-spacing:.2em;text-transform:uppercase"></div>
-      <button class="btn ghost block" id="join">Qo'shilish</button>
-    </div>
-    <p class="error-text" id="err" hidden style="margin-top:12px"></p>
-    <button class="link-btn" id="out" style="display:block;margin:14px auto 0">Boshqa hisob bilan kirish</button>`;
-  const err = $("#err", view);
-  const run = async (fn, btn) => { err.hidden = true; btn.disabled = true; try { await fn(); location.href = "index.html"; } catch (e) { err.textContent = errText(e); err.hidden = false; btn.disabled = false; } };
-  $("#create", view).addEventListener("click", (e) => run(() => Store.createHousehold($("#h-name", view).value.trim() || "Bizning uy"), e.currentTarget));
-  $("#join", view).addEventListener("click", (e) => { const code = $("#h-code", view).value.trim(); if (code.length < 6) { err.textContent = "Kod 6 belgidan iborat."; err.hidden = false; return; } run(() => Store.joinHousehold(code), e.currentTarget); });
-  $("#out", view).addEventListener("click", async () => { await Store.signOut(); route(); });
+/* ---------- Each phone, once: who is holding it? ---------- */
+function whoView(ctx) {
+  const members = [...ctx.members].sort((a, b) => (a.role === "xotin" ? -1 : b.role === "xotin" ? 1 : 0));
+  view.innerHTML = `<p style="text-align:center;margin:0 0 14px"><b>${esc(ctx.household.name)}</b> — bu telefon kimniki?</p>
+    <div class="who">${members.map((m) => `<button data-id="${m.id}">${App.avatar(m)}${esc(m.full_name)}<span class="small muted" style="font-weight:400">${m.role === "er" ? "Er" : "Xotin"}</span></button>`).join("")}</div>
+    <p class="hint" style="text-align:center;margin-top:18px">Telefon buni eslab qoladi — keyin bu savol berilmaydi.</p>
+    ${Store.mode === "demo" ? `<p class="hint" style="text-align:center">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefonni ulash uchun js/config.js ga InstantDB App ID ni yozing.</p>` : ""}`;
+  $$("[data-id]", view).forEach((b) => b.addEventListener("click", () => { Store.chooseMe(b.dataset.id); location.href = "index.html"; }));
 }
 
 async function route() {
-  if (Store.mode === "demo") { demoView(); return icons(); }
+  // Opened from a family link: remember the key, then drop it from the address bar.
+  const fromLink = (location.hash.match(/k=([\w-]+)/) || [])[1];
+  if (fromLink) history.replaceState(null, "", location.pathname);
   let ctx = null;
-  try { ctx = await Store.session(); } catch (e) { console.error(e); }
-  if (!ctx) Store.passwordless ? codeView() : authView("in");
-  else if (Store.passwordless && !ctx.profile) profileView();
-  else if (!ctx.household) householdView(ctx);
+  try {
+    if (fromLink && !(await Store.joinFamily(fromLink))) {
+      view.innerHTML = `<div class="empty"><div class="ico"><i data-lucide="link-2-off"></i></div><strong>Havola ishlamadi</strong><p>Bu havola bilan oila topilmadi. Juftingizdan havolani qayta so'rang.</p><button class="btn ghost" onclick="setupView()">Bosh sahifa</button></div>`;
+      return icons();
+    }
+    ctx = await Store.session();
+  } catch (e) {
+    console.error(e);
+    view.innerHTML = `<div class="empty"><div class="ico"><i data-lucide="wifi-off"></i></div><strong>Ulanib bo'lmadi</strong><p>Internetni tekshirib, qayta urinib ko'ring.</p><button class="btn primary" onclick="location.reload()">Qayta urinish</button></div>`;
+    return icons();
+  }
+  if (!ctx) setupView();
+  else if (!ctx.profile) whoView(ctx);
   else location.replace("index.html");
   icons();
 }
+window.setupView = setupView;
+window.addEventListener("hashchange", route);
 route();
 </script>
 </body>

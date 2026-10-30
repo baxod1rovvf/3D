@@ -2,7 +2,7 @@
 import { i } from "@instantdb/core";
 
 const s = () => i.string().optional();
-const scoped = () => i.string().indexed(); // household_id: every record belongs to one household
+const scoped = () => i.string().indexed(); // household_id: the family key every record belongs to
 
 const _schema = i.schema({
   entities: {
@@ -10,19 +10,16 @@ const _schema = i.schema({
       path: i.string().unique().indexed(),
       url: i.string(),
     }),
-    $users: i.entity({
-      email: i.string().unique().indexed().optional(),
-    }),
+    // The household's id is the family's secret key (shared once via the family link).
     households: i.entity({
       name: i.string(),
-      invite_code: i.string().unique().indexed(),
       created_at: s(),
     }),
-    // Profile id == the $users id of its owner.
+    // The two family members. No accounts: each phone remembers which profile it is.
     profiles: i.entity({
+      household_id: scoped(),
       full_name: i.string(),
       role: i.string(), // "er" | "xotin"
-      household_id: i.string().indexed().optional(),
       created_at: s(),
     }),
     grocery_items: i.entity({
@@ -94,12 +91,7 @@ const _schema = i.schema({
       created_at: s(),
     }),
   },
-  links: {
-    householdMembers: {
-      forward: { on: "households", has: "many", label: "members" },
-      reverse: { on: "$users", has: "many", label: "households" },
-    },
-  },
+  links: {},
   rooms: {},
 });
 

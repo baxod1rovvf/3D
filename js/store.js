@@ -1,21 +1,20 @@
-/* Oila Uchun — data layer.
- * Real backends: InstantDB (free, recommended) or Supabase — chosen by js/config.js.
- * Both give auth, per-household permissions, realtime sync and photo storage.
- * When js/config.js has no keys, a local demo backend with the same API is used
- * so the app can be previewed; two tabs sync via BroadcastChannel to imitate both partners.
+/* Oila Uchun — data layer. No accounts: the family is identified by a secret key.
+ *
+ * Setup: the first phone creates the family (both names) and gets a private family link
+ * (kirish.html#k=<key>). The partner opens that link once. Each phone remembers the key
+ * and which of the two people it belongs to.
+ *
+ * Real backend: InstantDB (free). Every read and write sends the key as a rule parameter,
+ * and instant.perms.ts only allows rows whose household_id equals that key.
+ * Without an App ID in js/config.js, a demo backend keeps data in this browser only.
  */
 (function () {
   const cfg = window.OILA_CONFIG || {};
-  const HAS_INSTANT = !!cfg.INSTANT_APP_ID;
-  const HAS_SUPABASE = !!(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY);
   const TABLES = ["grocery_items", "meals", "memories", "tasks", "notifications", "activity"];
 
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-" + Date.now() + Math.random().toString(16).slice(2));
   const nowIso = () => new Date().toISOString();
 
-  /* ------------------------------------------------------------------ */
-  /* Supabase backend                                                    */
-  /* ------------------------------------------------------------------ */
   function loadScript(src) {
     return new Promise((res, rej) => {
       const s = document.createElement("script");
@@ -24,105 +23,29 @@
     });
   }
 
-  function supabaseBackend() {
-    let sb, session, profile, partner, household;
+  /* What this phone remembers: the family key and who is holding it. */
+  const Device = {
+    get(k) { try { return sessionStorage.getItem(k) || localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, v); localStorage.setItem(k, v); } catch (e) {} },
+    del(k) { try { sessionStorage.removeItem(k); localStorage.removeItem(k); } catch (e) {} },
+    key() { return this.get("oila-family-key"); },
+    me() { return this.get("oila-me"); },
+  };
 
-    async function client() {
-      if (sb) return sb;
-      if (!window.supabase) await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js");
-      sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
-      return sb;
-    }
-    const check = ({ data, error }) => { if (error) throw error; return data; };
-
-    return {
-      mode: "supabase",
-      async session() {
-        const c = await client();
-        session = check(await c.auth.getSession()).session;
-        if (!session) return null;
-        profile = check(await c.from("profiles").select("*").eq("id", session.user.id).maybeSingle());
-        if (!profile || !profile.household_id) return { user: session.user, profile, partner: null, household: null };
-        household = check(await c.from("households").select("*").eq("id", profile.household_id).single());
-        const members = check(await c.from("profiles").select("*").eq("household_id", profile.household_id));
-        partner = members.find((m) => m.id !== profile.id) || null;
-        return { user: session.user, profile, partner, household };
-      },
-      async signIn(email, password) { const c = await client(); check(await c.auth.signInWithPassword({ email, password })); },
-      async signUp(email, password, full_name, role) {
-        const c = await client();
-        const data = check(await c.auth.signUp({ email, password, options: { data: { full_name, role } } }));
-        return { needsConfirm: !data.session };
-      },
-      async signOut() { const c = await client(); await c.auth.signOut(); },
-      async createHousehold(name) { const c = await client(); return check(await c.rpc("create_household", { p_name: name })); },
-      async joinHousehold(code) { const c = await client(); return check(await c.rpc("join_household", { p_code: code.trim().toUpperCase() })); },
-
-      async list(table, opts = {}) {
-        const c = await client();
-        let q = c.from(table).select("*").eq("household_id", profile.household_id);
-        if (table === "notifications") q = q.eq("recipient_id", profile.id);
-        q = q.order(opts.order || "created_at", { ascending: !!opts.asc });
-        if (opts.limit) q = q.limit(opts.limit);
-        return check(await q);
-      },
-      async insert(table, row) {
-        const c = await client();
-        return check(await c.from(table).insert({ household_id: profile.household_id, ...row }).select().single());
-      },
-      async insertMany(table, rows) {
-        const c = await client();
-        return check(await c.from(table).insert(rows.map((r) => ({ household_id: profile.household_id, ...r }))).select());
-      },
-      async update(table, id, patch) {
-        const c = await client();
-        return check(await c.from(table).update(patch).eq("id", id).select().single());
-      },
-      async updateWhere(table, match, patch) {
-        const c = await client();
-        let q = c.from(table).update(patch).eq("household_id", profile.household_id);
-        for (const k in match) q = q.eq(k, match[k]);
-        check(await q);
-      },
-      async remove(table, id) { const c = await client(); check(await c.from(table).delete().eq("id", id)); },
-
-      subscribe(tables, cb) {
-        const ch = sb.channel("household-" + profile.household_id + "-" + uid());
-        tables.forEach((t) => {
-          const filter = t === "notifications" ? `recipient_id=eq.${profile.id}` : `household_id=eq.${profile.household_id}`;
-          ch.on("postgres_changes", { event: "*", schema: "public", table: t, filter }, (p) => cb(t, p));
-        });
-        ch.subscribe();
-        return () => sb.removeChannel(ch);
-      },
-
-      async uploadPhoto(blob) {
-        const c = await client();
-        const path = `${profile.household_id}/${uid()}.jpg`;
-        check(await c.storage.from(cfg.PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false }));
-        return path;
-      },
-      async photoUrls(paths) {
-        const c = await client();
-        const list = paths.filter(Boolean);
-        if (!list.length) return {};
-        const data = check(await c.storage.from(cfg.PHOTO_BUCKET).createSignedUrls(list, 60 * 60));
-        const out = {};
-        data.forEach((d) => { if (d.signedUrl) out[d.path] = d.signedUrl; });
-        return out;
-      },
-      async removePhoto(path) { if (!path) return; const c = await client(); await c.storage.from(cfg.PHOTO_BUCKET).remove([path]); },
-    };
+  function sortRows(rows, opts = {}) {
+    const k = opts.order || "created_at";
+    rows.sort((a, b) => ((a[k] ?? "") > (b[k] ?? "") ? 1 : (a[k] ?? "") < (b[k] ?? "") ? -1 : 0) * (opts.asc ? 1 : -1));
+    return opts.limit ? rows.slice(0, opts.limit) : rows;
   }
 
   /* ------------------------------------------------------------------ */
-  /* InstantDB backend (free plan: auth, realtime, storage, permissions) */
+  /* InstantDB backend                                                   */
   /* ------------------------------------------------------------------ */
   function instantBackend() {
-    let db, user, profile, partner, household;
-    const hid = () => household && household.id;
-    const scopeKey = (table) => (table === "notifications" ? "recipient_id" : "household_id");
-    const scopeVal = (table) => (table === "notifications" ? profile.id : hid());
+    let db, profile;
+    const key = () => Device.key();
+    const rp = () => ({ ruleParams: { key: key() } });
+    const scope = (table) => (table === "notifications" ? { household_id: key(), recipient_id: profile.id } : { household_id: key() });
 
     async function client() {
       if (db) return db;
@@ -130,107 +53,67 @@
       db = window.instant.init({ appId: cfg.INSTANT_APP_ID });
       return db;
     }
-    async function q(query, opts) { const c = await client(); return (await c.queryOnce(query, opts)).data; }
-    const inviteCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
+    async function q(query, k = key()) { const c = await client(); return (await c.queryOnce(query, { ruleParams: { key: k } })).data; }
+    const tx = (c, table, id, k = key()) => c.tx[table][id].ruleParams({ key: k });
     // Instant rejects undefined values; keep nulls (they clear a field).
     const clean = (o) => JSON.parse(JSON.stringify(o, (k, v) => (v === undefined ? null : v)));
-    function sortRows(rows, opts = {}) {
-      const k = opts.order || "created_at";
-      rows.sort((a, b) => ((a[k] ?? "") > (b[k] ?? "") ? 1 : (a[k] ?? "") < (b[k] ?? "") ? -1 : 0) * (opts.asc ? 1 : -1));
-      return opts.limit ? rows.slice(0, opts.limit) : rows;
-    }
 
     return {
       mode: "instant",
-      passwordless: true,
-      async session() {
-        const c = await client();
-        user = await c.getAuth();
-        if (!user) return null;
-        const data = await q({ profiles: { $: { where: { id: user.id } } }, households: {} });
-        profile = data.profiles[0] || null;
-        // Only households this user is a member of are visible (see instant.perms.ts).
-        household = data.households[0] || null;
-        if (!profile || !household) return { user, profile, partner: null, household: null };
-        if (profile.household_id !== household.id) {
-          await c.transact(c.tx.profiles[user.id].update({ household_id: household.id }));
-          profile.household_id = household.id;
-        }
-        const members = (await q({ profiles: { $: { where: { household_id: household.id } } } })).profiles;
-        partner = members.find((m) => m.id !== user.id) || null;
-        return { user, profile, partner, household };
+      async family(k = key()) {
+        if (!k) return null;
+        const data = await q({ households: { $: { where: { id: k } } }, profiles: { $: { where: { household_id: k } } } }, k);
+        const household = data.households[0];
+        return household ? { household, members: data.profiles } : null;
       },
-      async sendCode(email) { const c = await client(); await c.auth.sendMagicCode({ email }); },
-      async verifyCode(email, code) { const c = await client(); await c.auth.signInWithMagicCode({ email, code }); },
-      async saveProfile(full_name, role) {
+      async createFamily({ familyName, wifeName, husbandName }) {
         const c = await client();
-        const u = await c.getAuth();
-        await c.transact(c.tx.profiles[u.id].update({ full_name, role, created_at: nowIso() }));
-      },
-      async signIn() { throw new Error("Use sendCode / verifyCode"); },
-      async signUp() { throw new Error("Use sendCode / verifyCode"); },
-      async signOut() { const c = await client(); await c.auth.signOut(); },
-      async createHousehold(name) {
-        const c = await client();
-        const u = await c.getAuth();
-        const id = window.instant.id(), code = inviteCode();
-        await c.transact(c.tx.households[id].update({ name, invite_code: code, created_at: nowIso() }));
-        // Joining goes through the same invite-code rule as the partner (max two members).
+        const k = window.instant.id();
         await c.transact([
-          c.tx.households[id].ruleParams({ code }).link({ members: u.id }),
-          c.tx.profiles[u.id].update({ household_id: id }),
+          tx(c, "households", k, k).update({ name: familyName, created_at: nowIso() }),
+          tx(c, "profiles", window.instant.id(), k).update({ household_id: k, full_name: wifeName, role: "xotin", created_at: nowIso() }),
+          tx(c, "profiles", window.instant.id(), k).update({ household_id: k, full_name: husbandName, role: "er", created_at: nowIso() }),
         ]);
-      },
-      async joinHousehold(raw) {
-        const c = await client();
-        const u = await c.getAuth();
-        const code = raw.trim().toUpperCase();
-        const h = (await q({ households: { $: { where: { invite_code: code } } } }, { ruleParams: { code } })).households[0];
-        if (!h) throw new Error("invalid_code");
-        try {
-          await c.transact([
-            c.tx.households[h.id].ruleParams({ code }).link({ members: u.id }),
-            c.tx.profiles[u.id].update({ household_id: h.id }),
-          ]);
-        } catch (e) { throw new Error("household_full"); }  // the only rule that can refuse a valid code
+        Device.set("oila-family-key", k);
+        return k;
       },
 
       async list(table, opts = {}) {
-        const data = await q({ [table]: { $: { where: { [scopeKey(table)]: scopeVal(table) } } } });
+        const data = await q({ [table]: { $: { where: scope(table) } } });
         return sortRows(data[table], opts);
       },
       async insert(table, row) {
         const c = await client();
-        const full = clean({ created_at: nowIso(), ...row, household_id: hid() });
+        const full = clean({ created_at: nowIso(), ...row, household_id: key() });
         const id = window.instant.id();
-        await c.transact(c.tx[table][id].update(full));
+        await c.transact(tx(c, table, id).update(full));
         return { id, ...full };
       },
       async insertMany(table, rows) {
         const c = await client();
-        const out = rows.map((r) => ({ id: window.instant.id(), ...clean({ created_at: nowIso(), ...r, household_id: hid() }) }));
-        await c.transact(out.map(({ id, ...r }) => c.tx[table][id].update(r)));
+        const out = rows.map((r) => ({ id: window.instant.id(), ...clean({ created_at: nowIso(), ...r, household_id: key() }) }));
+        await c.transact(out.map(({ id, ...r }) => tx(c, table, id).update(r)));
         return out;
       },
       async update(table, id, patch) {
         const c = await client();
         const p = clean(patch);
         delete p.household_id;
-        await c.transact(c.tx[table][id].update(p));
+        await c.transact(tx(c, table, id).update(p));
         return { id, ...p };
       },
       async updateWhere(table, match, patch) {
         const c = await client();
         const rows = (await this.list(table)).filter((r) => Object.keys(match).every((k) => r[k] === match[k]));
-        if (rows.length) await c.transact(rows.map((r) => c.tx[table][r.id].update(clean(patch))));
+        if (rows.length) await c.transact(rows.map((r) => tx(c, table, r.id).update(clean(patch))));
       },
-      async remove(table, id) { const c = await client(); await c.transact(c.tx[table][id].delete()); },
+      async remove(table, id) { const c = await client(); await c.transact(tx(c, table, id).delete()); },
 
       subscribe(tables, cb) {
         // Instant pushes whole query results; diff ids so callers still see INSERTs.
         const unsubs = tables.map((t) => {
           let known = null;
-          return db.subscribeQuery({ [t]: { $: { where: { [scopeKey(t)]: scopeVal(t) } } } }, (resp) => {
+          return db.subscribeQuery({ [t]: { $: { where: scope(t) } } }, (resp) => {
             if (resp.error || !resp.data) return;
             const rows = resp.data[t];
             if (known) {
@@ -238,14 +121,14 @@
               cb(t, { eventType: "UPDATE", new: {} });
             }
             known = new Set(rows.map((r) => r.id));
-          });
+          }, rp());
         });
         return () => unsubs.forEach((u) => u());
       },
 
       async uploadPhoto(blob) {
         const c = await client();
-        const path = `${hid()}/${window.instant.id()}.jpg`;
+        const path = `${key()}/${window.instant.id()}.jpg`;
         await c.storage.uploadFile(path, blob, { contentType: "image/jpeg" });
         return path;
       },
@@ -260,31 +143,31 @@
       async removePhoto(path) {
         if (!path) return;
         const c = await client();
-        try { await c.transact(c.tx.$files[window.instant.lookup("path", path)].delete()); } catch (e) { console.warn(e); }
+        try { await c.transact(tx(c, "$files", window.instant.lookup("path", path)).delete()); } catch (e) { console.warn(e); }
       },
+      _setProfile(p) { profile = p; },
     };
   }
 
   /* ------------------------------------------------------------------ */
-  /* Demo backend (preview only)                                         */
+  /* Demo backend (preview only, data stays in this browser)             */
   /* ------------------------------------------------------------------ */
   function demoBackend() {
-    const KEY = "oila-demo-db-v1";
-    const ME = "oila-demo-me";
+    const KEY = "oila-demo-db-v2";
     const bc = "BroadcastChannel" in window ? new BroadcastChannel("oila-demo") : null;
     const listeners = new Set();
 
-    const HH = "hh-demo";
-    const WIFE = { id: "u-xotin", household_id: HH, full_name: "Malika", role: "xotin" };
-    const HUSB = { id: "u-er", household_id: HH, full_name: "Jasur", role: "er" };
+    const HH = "demo-family";
+    const WIFE = { id: "u-xotin", household_id: HH, role: "xotin" };
+    const HUSB = { id: "u-er", household_id: HH, role: "er" };
 
-    function seed() {
+    function seed(wifeName, husbName, familyName) {
       const d = (offset) => { const x = new Date(); x.setDate(x.getDate() + offset); return x.toISOString().slice(0, 10); };
       const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
       const g = (name, category, status, extra = {}) => ({ id: uid(), household_id: HH, name, category, status, quantity: "", note: "", urgent: false, added_by: WIFE.id, marked_by: status !== "bor" ? WIFE.id : null, marked_at: status !== "bor" ? ago(90) : null, purchased_by: status === "olindi" ? HUSB.id : null, purchased_at: status === "olindi" ? ago(30) : null, created_at: ago(5000), ...extra });
       return {
-        household: { id: HH, name: "Bizning uy", invite_code: "NEST24" },
-        profiles: [WIFE, HUSB],
+        household: { id: HH, name: familyName },
+        profiles: [{ ...WIFE, full_name: wifeName }, { ...HUSB, full_name: husbName }],
         grocery_items: [
           g("Pomidor", "sabzavot", "kerak", { quantity: "1 kg" }),
           g("Kartoshka", "sabzavot", "bor"),
@@ -322,20 +205,19 @@
           { id: uid(), household_id: HH, title: "Bozorlik qilish", description: "", assignee_id: HUSB.id, due_date: d(1), priority: "yuqori", done: false, completed_by: null, completed_at: null, remind_at: null, reminded: false, created_by: WIFE.id, created_at: ago(200) },
         ],
         notifications: [
-          { id: uid(), household_id: HH, recipient_id: HUSB.id, actor_id: WIFE.id, module: "grocery", text: "Malika ro'zg'orga «Sut»ni qo'shdi", link: "rozgor.html", read: false, created_at: ago(90) },
-          { id: uid(), household_id: HH, recipient_id: WIFE.id, actor_id: HUSB.id, module: "tasks", text: "Jasur «Chiqindilarni tashlash» ishini bajardi", link: "uy-ishlari.html", read: false, created_at: ago(45) },
+          { id: uid(), household_id: HH, recipient_id: HUSB.id, actor_id: WIFE.id, module: "grocery", text: `${wifeName} ro'zg'orga «Sut»ni qo'shdi`, link: "rozgor.html", read: false, created_at: ago(90) },
+          { id: uid(), household_id: HH, recipient_id: WIFE.id, actor_id: HUSB.id, module: "tasks", text: `${husbName} «Chiqindilarni tashlash» ishini bajardi`, link: "uy-ishlari.html", read: false, created_at: ago(45) },
         ],
         activity: [
-          { id: uid(), household_id: HH, actor_id: WIFE.id, module: "grocery", text: "Malika ro'zg'orga «Sut»ni qo'shdi", created_at: ago(90) },
-          { id: uid(), household_id: HH, actor_id: HUSB.id, module: "tasks", text: "Jasur «Chiqindilarni tashlash» ishini bajardi", created_at: ago(45) },
-          { id: uid(), household_id: HH, actor_id: HUSB.id, module: "grocery", text: "Jasur «Banan»ni xarid qildi", created_at: ago(30) },
+          { id: uid(), household_id: HH, actor_id: WIFE.id, module: "grocery", text: `${wifeName} ro'zg'orga «Sut»ni qo'shdi`, created_at: ago(90) },
+          { id: uid(), household_id: HH, actor_id: HUSB.id, module: "tasks", text: `${husbName} «Chiqindilarni tashlash» ishini bajardi`, created_at: ago(45) },
+          { id: uid(), household_id: HH, actor_id: HUSB.id, module: "grocery", text: `${husbName} «Banan»ni xarid qildi`, created_at: ago(30) },
         ],
-      };
-    }
+      };    }
 
-    const read = () => { try { const v = JSON.parse(localStorage.getItem(KEY)); if (v) return v; } catch (e) {} const s = seed(); write(s); return s; };
-    function write(db) {
-      try { localStorage.setItem(KEY, JSON.stringify(db)); }
+    const read = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } };
+    function write(data) {
+      try { localStorage.setItem(KEY, JSON.stringify(data)); }
       catch (e) { throw new Error("Demo xotira to'ldi. Kichikroq rasm tanlang."); }
     }
     const emit = (table, payload) => {
@@ -345,55 +227,46 @@
     if (bc) bc.onmessage = (m) => listeners.forEach((l) => l(m.data.table || "*", m.data.payload || {}));
     window.addEventListener("storage", (e) => { if (e.key === KEY) listeners.forEach((l) => l("*", {})); });
 
-    // Each tab may act as a different partner (sessionStorage), defaulting to the last choice.
-    const meId = () => { try { return sessionStorage.getItem(ME) || localStorage.getItem(ME); } catch (e) { return null; } };
-    const setMe = (id) => { try { sessionStorage.setItem(ME, id); localStorage.setItem(ME, id); } catch (e) {} };
-    const me = () => read().profiles.find((p) => p.id === meId());
-
     return {
       mode: "demo",
-      async session() {
-        const p = me();
-        if (!p) return null;
-        const db = read();
-        return { user: { id: p.id, email: p.role + "@demo" }, profile: p, partner: db.profiles.find((x) => x.id !== p.id), household: db.household };
+      async family(k = Device.key()) {
+        const data = read();
+        if (!data || k !== HH) return null;
+        return { household: data.household, members: data.profiles };
       },
-      async signIn(role) { setMe(role === "er" ? HUSB.id : WIFE.id); },
-      async signUp() { throw new Error("Demo rejimda ro'yxatdan o'tish yo'q"); },
-      async signOut() { try { sessionStorage.removeItem(ME); localStorage.removeItem(ME); } catch (e) {} },
-      switchUser() { setMe(meId() === HUSB.id ? WIFE.id : HUSB.id); },
-      reset() { localStorage.removeItem(KEY); },
-      async createHousehold() {}, async joinHousehold() {},
+      async createFamily({ familyName, wifeName, husbandName }) {
+        write(seed(wifeName, husbandName, familyName));
+        Device.set("oila-family-key", HH);
+        return HH;
+      },
 
       async list(table, opts = {}) {
         let rows = read()[table].slice();
-        if (table === "notifications") rows = rows.filter((r) => r.recipient_id === meId());
-        const k = opts.order || "created_at";
-        rows.sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * (opts.asc ? 1 : -1));
-        return opts.limit ? rows.slice(0, opts.limit) : rows;
+        if (table === "notifications") rows = rows.filter((r) => r.recipient_id === Device.me());
+        return sortRows(rows, opts);
       },
       async insert(table, row) {
-        const db = read();
+        const data = read();
         const full = { id: uid(), household_id: HH, created_at: nowIso(), ...row };
-        db[table].push(full); write(db); emit(table, { eventType: "INSERT", new: full });
+        data[table].push(full); write(data); emit(table, { eventType: "INSERT", new: full });
         return full;
       },
       async insertMany(table, rows) { const out = []; for (const r of rows) out.push(await this.insert(table, r)); return out; },
       async update(table, id, patch) {
-        const db = read();
-        const r = db[table].find((x) => x.id === id);
+        const data = read();
+        const r = data[table].find((x) => x.id === id);
         if (!r) throw new Error("Topilmadi");
-        Object.assign(r, patch); write(db); emit(table, { eventType: "UPDATE", new: r });
+        Object.assign(r, patch); write(data); emit(table, { eventType: "UPDATE", new: r });
         return r;
       },
       async updateWhere(table, match, patch) {
-        const db = read();
-        db[table].forEach((r) => { if (Object.keys(match).every((k) => r[k] === match[k])) Object.assign(r, patch); });
-        write(db); emit(table, { eventType: "UPDATE", new: {} });
+        const data = read();
+        data[table].forEach((r) => { if (Object.keys(match).every((k) => r[k] === match[k])) Object.assign(r, patch); });
+        write(data); emit(table, { eventType: "UPDATE", new: {} });
       },
       async remove(table, id) {
-        const db = read();
-        db[table] = db[table].filter((x) => x.id !== id); write(db); emit(table, { eventType: "DELETE", old: { id } });
+        const data = read();
+        data[table] = data[table].filter((x) => x.id !== id); write(data); emit(table, { eventType: "DELETE", old: { id } });
       },
       subscribe(tables, cb) {
         const l = (t, p) => { if (t === "*" || tables.includes(t)) cb(t, p); };
@@ -401,15 +274,15 @@
         return () => listeners.delete(l);
       },
       async uploadPhoto(blob) {
-        const dataUrl = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
-        return dataUrl;
+        return await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
       },
       async photoUrls(paths) { const o = {}; paths.filter(Boolean).forEach((p) => (o[p] = p)); return o; },
       async removePhoto() {},
+      _setProfile() {},
     };
   }
 
-  const backend = HAS_INSTANT ? instantBackend() : HAS_SUPABASE ? supabaseBackend() : demoBackend();
+  const backend = cfg.INSTANT_APP_ID ? instantBackend() : demoBackend();
 
   /* ------------------------------------------------------------------ */
   /* Shared helpers on top of the backend                                */
@@ -417,6 +290,32 @@
   const Store = Object.assign(backend, {
     TABLES,
     ctx: null,
+    Device,
+
+    /** Who is using this phone, inside the family on this phone. Null until both are known. */
+    async session() {
+      const fam = await backend.family();
+      if (!fam) return null;
+      const profile = fam.members.find((m) => m.id === Device.me()) || null;
+      if (!profile) return { household: fam.household, members: fam.members, profile: null, partner: null };
+      const partner = fam.members.find((m) => m.id !== profile.id) || null;
+      backend._setProfile(profile);
+      return { household: fam.household, members: fam.members, profile, partner };
+    },
+    /** Save the family key from a family link; resolves to the family or null if the key is unknown. */
+    async joinFamily(k) {
+      const fam = await backend.family(k);
+      if (fam) Device.set("oila-family-key", k);
+      return fam;
+    },
+    chooseMe(id) { Device.set("oila-me", id); },
+    /** Private link the partner opens once to connect their phone. */
+    familyLink() {
+      const base = location.href.replace(/[#?].*$/, "").replace(/[^/]*$/, "");
+      return `${base}kirish.html#k=${Device.key()}`;
+    },
+    /** Disconnect this phone (the family's data stays). */
+    forgetDevice() { Device.del("oila-family-key"); Device.del("oila-me"); },
 
     /** Record an activity and notify the partner (never the actor). */
     async log(module, text, link) {
