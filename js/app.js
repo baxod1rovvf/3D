@@ -324,6 +324,8 @@
     catch (e) { try { await sub.unsubscribe(); } catch (e2) {} throw e; }
     return true;
   }
+  /** Resolves with the promise result, or undefined after ms (never hangs the caller). */
+  const withTimeout = (promise, ms = 3000) => Promise.race([promise, new Promise((res) => setTimeout(res, ms))]);
   /** Non-fatal: point this browser's existing push subscription at another person (after "Men ...man"). */
   async function rebindPush(profile) {
     try {
@@ -431,11 +433,11 @@
         $("[data-out]", el).addEventListener("click", async () => {
           api.close();
           if (!(await confirmSheet("Bu telefon oiladan uziladi. Ma'lumotlar o'chmaydi — juftingiz bergan kod bilan qayta ulanish mumkin.", "Telefonni uzish"))) return;
-          await disablePushQuietly();
+          await withTimeout(disablePushQuietly());
           Store.forgetDevice(); location.href = "kirish.html";
         });
         const sw = $("[data-switch]", el);
-        if (sw) sw.addEventListener("click", async () => { Store.chooseMe(c.partner.id); await rebindPush(c.partner); location.reload(); });
+        if (sw) sw.addEventListener("click", async () => { Store.chooseMe(c.partner.id); await withTimeout(rebindPush(c.partner)); location.reload(); });
       },
     });
   }

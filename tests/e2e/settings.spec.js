@@ -119,6 +119,24 @@ const SHOT = "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42/s
   const c2 = await p3.evaluate(() => JSON.parse(sessionStorage.getItem("__calls")));
   assert.deepStrictEqual(c2[c2.length - 1], ["del", "https://push.example/abc"]);
 
+  // Hanging push APIs must not block switch / disconnect.
+  const p4 = track(await ctx.newPage());
+  await p4.addInitScript(() => {
+    if (!sessionStorage.getItem("oila-me")) { sessionStorage.setItem("oila-family-key", "demo-family"); sessionStorage.setItem("oila-me", "u-xotin"); }
+    const never = new Promise(() => {});
+    Object.defineProperty(navigator.serviceWorker, "ready", { get: () => Promise.resolve({ pushManager: { getSubscription: () => never } }) });
+  });
+  await p4.goto(BASE + "/index.html");
+  await p4.waitForFunction(() => window.Store && Store.ctx);
+  const was = await p4.evaluate(() => Store.ctx.profile.id);
+  await p4.click("#settings-btn");
+  await p4.click("[data-switch]");
+  await p4.waitForFunction((id) => window.Store && Store.ctx && Store.ctx.profile.id !== id, was, { timeout: 6000 });
+  await p4.click("#settings-btn");
+  await p4.click("[data-out]");
+  await p4.click(".sheet .btn.danger, .sheet [data-ok], .sheet .btn.primary");
+  await p4.waitForURL("**/kirish.html", { timeout: 6000 });
+
   await browser.close();
   assert.deepStrictEqual(errors, []);
   console.log("settings.spec OK");
