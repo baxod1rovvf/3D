@@ -13,7 +13,6 @@
   --muted: #625B7A;
   --line: #F1E5D3;
   --line-2: #E6D6BF;
-  --sage: #1E9A5E;
   --sage-soft: #DDF5E8;
   --honey: #E09E00;
   --honey-soft: #FFF1C4;
@@ -23,7 +22,6 @@
   --her: #D6336C;
   --him: #3F5FCC;
 
-  --r-sm: 12px;
   --r: 22px;
   --r-lg: 26px;
   --shadow: 0 3px 0 rgba(43, 36, 64, .06), 0 8px 22px rgba(43, 36, 64, .07);
@@ -31,7 +29,6 @@
 
   --font: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
   --display: "Fredoka", "Nunito", system-ui, sans-serif;
-  --serif: var(--display);
 
   --t-fast: 140ms;
   --t: 220ms;
@@ -180,7 +177,6 @@ img { display: block; max-width: 100%; }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
 .section-head h2 { margin: 0; font-family: var(--display); font-size: 19px; font-weight: 600; color: var(--ink); letter-spacing: 0; text-transform: none; }
 .section-head a, .link-btn { font-size: 14px; color: var(--accent-ink); font-weight: 800; background: none; border: 0; padding: 10px 0; min-height: 44px; }
-.serif, .display { font-family: var(--display); }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 
@@ -398,7 +394,6 @@ img { display: block; max-width: 100%; }
   .skeleton { animation: shimmer 1.2s infinite linear; }
   .empty .ico { animation: bob 2.4s ease-in-out infinite; }
   .wobble-in { animation: wobble-in 620ms var(--bounce) both; }
-  .pop { animation: pop 380ms var(--bounce); }
   .tab.active .pill { animation: pop 420ms var(--bounce); }
   .btn.primary:hover .emo, .btn.accent:hover .emo { animation: wiggle 500ms ease; }
 }

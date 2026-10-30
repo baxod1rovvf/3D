@@ -88,6 +88,26 @@ const PAGES = [
   await page.screenshot({ path: `${SHOTS}/design-add-sheet.png` });
   const sheetOverflow = await page.evaluate(() => { const b = document.querySelector(".sheet-body"); return b.scrollWidth - b.clientWidth; });
   assert.ok(sheetOverflow <= 0, "sheet horizontal overflow " + sheetOverflow);
+  await page.click(".sheet [data-close]");
+  await page.waitForTimeout(400);
+
+  // New row wobbles in, and keeps animating through the debounced realtime re-render (~120ms).
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.click("#add");
+  await page.waitForSelector(".sheet.open #g-name");
+  await page.fill("#g-name", "Qulupnay");
+  await page.selectOption("#g-cat", "meva");
+  await page.click(".sheet [data-save]");
+  await page.waitForTimeout(300);
+  const wob = await page.evaluate(() => {
+    const r = [...document.querySelectorAll(".g-row")].find((x) => x.textContent.includes("Qulupnay"));
+    if (!r) return null;
+    const a = r.getAnimations().find((x) => x.animationName === "wobble-in");
+    return { cls: r.classList.contains("wobble-in"), t: a ? a.currentTime : null };
+  });
+  assert.ok(wob && wob.cls, "new row keeps .wobble-in ~300ms after save: " + JSON.stringify(wob));
+  assert.ok(wob.t !== null && wob.t >= 200, "wobble-in resumed, not restarted: " + JSON.stringify(wob));
+  await page.emulateMedia({ reducedMotion: "reduce" });
 
   // Taomlar: ingredient chips carry stickers.
   await page.goto(BASE + "/taomlar.html");

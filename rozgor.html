@@ -59,7 +59,7 @@
   .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -1px; margin-right: 4px; }
   .bar { display: flex; gap: 8px; margin-top: 14px; }
   .bar .btn { flex: 1; min-height: 46px; font-size: 14.5px; padding: 0 12px; }
-  .restock { min-height: 40px; padding: 0 12px; font-size: 13.5px; box-shadow: 0 2px 0 var(--line-2); }
+  .restock { min-height: 48px; padding: 0 12px; font-size: 13.5px; box-shadow: 0 2px 0 var(--line-2); }
 
   /* Live sticker preview in the editor */
   .name-row { display: flex; align-items: center; gap: 12px; }
@@ -98,7 +98,10 @@ const CATS = [
 const catOf = (id) => CATS.find((c) => c.id === id) || CATS[CATS.length - 1];
 const stickerOf = (i) => Stickers.forName(i.name, catOf(i.category).id);
 const sticker = (i) => `<span class="sticker" aria-hidden="true">${stickerOf(i)}</span>`;
-let freshId = null; // the row just added wobbles in once
+// The row just added wobbles in once. Realtime re-renders replace #list within the animation's
+// 620ms, so keep the start time and resume each redraw where it left off (negative delay).
+const WOBBLE_MS = 620;
+let fresh = null; // { id, t0 }
 
 let view = new URLSearchParams(location.search).get("view") || "all";
 let items = [];
@@ -179,7 +182,15 @@ function draw() {
       : empty("Xarid qilinganlar yo'q", "Do'kondan olingan mahsulotlar shu yerda ko'rinadi.", "🛍️");
   }
   $("#list").innerHTML = html;
-  if (freshId) { const r = $(`.g-row[data-id="${freshId}"]`); if (r) r.classList.add("wobble-in"); freshId = null; }
+  if (fresh) {
+    const r = $(`.g-row[data-id="${fresh.id}"]`);
+    if (r) {
+      if (fresh.t0 == null) fresh.t0 = performance.now();
+      const elapsed = performance.now() - fresh.t0;
+      if (elapsed < WOBBLE_MS) { r.style.animationDelay = `-${Math.round(elapsed)}ms`; r.classList.add("wobble-in"); }
+      else fresh = null;
+    }
+  }
   icons();
   const h = $("#history") || $("#history2"); if (h) h.addEventListener("click", openHistory);
   const ra = $("#restock-all"); if (ra) ra.addEventListener("click", restockAll);
@@ -275,7 +286,7 @@ function openEditor(item) {
           if (isNew) {
             const needed = f.elements.needed.checked;
             const row = await Store.insert("grocery_items", { ...v, status: needed ? "kerak" : "bor", added_by: me, marked_by: needed ? me : null, marked_at: needed ? new Date().toISOString() : null });
-            freshId = row && row.id;
+            fresh = row && row.id ? { id: row.id, t0: null } : null;
             if (needed) Store.notify("grocery_need", { item: v.name }, "rozgor.html?view=need");
             App.toast(`${Stickers.forName(v.name, v.category)} «${v.name}» qo'shildi`);
           } else {
