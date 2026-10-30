@@ -4,9 +4,10 @@
  * (kirish.html#k=<key>). The partner opens that link once. Each phone remembers the key
  * and which of the two people it belongs to.
  *
- * Real backend: a free Cloudflare Worker + D1 database (cloudflare/worker.js). Every request
- * sends the key, and the Worker only touches rows whose household_id equals it.
- * Without API_URL in js/config.js, a demo backend keeps data in this browser only.
+ * Real backend: Supabase (supabase/schema.sql) — the key is sent as the "x-family-key" header and
+ * Row Level Security only returns rows whose household_id equals it. A Cloudflare Worker + D1
+ * (cloudflare/worker.js) is also supported. With neither set in js/config.js, a demo backend
+ * keeps data in this browser only.
  */
 (function () {
   const cfg = window.OILA_CONFIG || {};
@@ -126,6 +127,128 @@
         return out;
       },
       async removePhoto(path) { if (path) try { await call(`/photos/${encodeURIComponent(path)}`, { method: "DELETE" }); } catch (e) { console.warn(e); } },
+      _setProfile(p) { profile = p; },
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Supabase backend (supabase/schema.sql)                              */
+  /* ------------------------------------------------------------------ */
+  function supabaseBackend() {
+    let profile;
+    const clients = {};
+    const key = () => Device.key();
+    const check = ({ data, error }) => { if (error) throw error; return data; };
+
+    // The family key travels as a header; Row Level Security compares it with household_id.
+    async function client(k = key()) {
+      if (!window.supabase) await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js");
+      if (!clients[k]) clients[k] = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { "x-family-key": k || "" } },
+      });
+      return clients[k];
+    }
+
+    // Live sync: each write is announced on a broadcast channel named after the secret key.
+    const listeners = new Set();
+    let channel = null;
+    async function room() {
+      if (channel) return channel;
+      const c = await client();
+      channel = c.channel("oila-" + key(), { config: { broadcast: { self: false } } });
+      channel.on("broadcast", { event: "change" }, ({ payload }) => listeners.forEach((l) => l(payload.table, payload)));
+      channel.subscribe();
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) listeners.forEach((l) => l("*", {})); });
+      return channel;
+    }
+    async function announce(table, payload) {
+      listeners.forEach((l) => l(table, payload));
+      try { (await room()).send({ type: "broadcast", event: "change", payload: { table, ...payload } }); } catch (e) { console.warn(e); }
+    }
+
+    return {
+      mode: "supabase",
+      async family(k = key()) {
+        if (!k) return null;
+        const c = await client(k);
+        const household = check(await c.from("households").select("key, name, created_at").eq("key", k).maybeSingle());
+        if (!household) return null;
+        const members = check(await c.from("profiles").select("*").eq("household_id", k));
+        return { household: { id: household.key, name: household.name, created_at: household.created_at }, members };
+      },
+      async createFamily({ familyName, wifeName, husbandName }) {
+        const k = crypto.randomUUID();
+        const c = await client(k);
+        check(await c.from("households").insert({ key: k, name: familyName }));
+        check(await c.from("profiles").insert([
+          { household_id: k, full_name: wifeName, role: "xotin" },
+          { household_id: k, full_name: husbandName, role: "er" },
+        ]));
+        Device.set("oila-family-key", k);
+        return k;
+      },
+
+      async list(table, opts = {}) {
+        const c = await client();
+        let qy = c.from(table).select("*").eq("household_id", key());
+        if (table === "notifications") qy = qy.eq("recipient_id", profile.id);
+        return sortRows(check(await qy), opts);
+      },
+      async insert(table, row) {
+        const c = await client();
+        const r = check(await c.from(table).insert({ ...row, household_id: key() }).select().single());
+        announce(table, { eventType: "INSERT", new: r });
+        return r;
+      },
+      async insertMany(table, rows) {
+        const c = await client();
+        const out = check(await c.from(table).insert(rows.map((r) => ({ ...r, household_id: key() }))).select());
+        announce(table, { eventType: "UPDATE", new: {} });
+        return out;
+      },
+      async update(table, id, patch) {
+        const c = await client();
+        const { household_id, ...p } = patch;
+        const r = check(await c.from(table).update(p).eq("id", id).select().single());
+        announce(table, { eventType: "UPDATE", new: r });
+        return r;
+      },
+      async updateWhere(table, match, patch) {
+        const c = await client();
+        let qy = c.from(table).update(patch).eq("household_id", key());
+        for (const k in match) qy = qy.eq(k, match[k]);
+        check(await qy);
+        announce(table, { eventType: "UPDATE", new: {} });
+      },
+      async remove(table, id) {
+        const c = await client();
+        check(await c.from(table).delete().eq("id", id));
+        announce(table, { eventType: "DELETE", old: { id } });
+      },
+      subscribe(tables, cb) {
+        const l = (t, p) => { if (t === "*" || tables.includes(t)) cb(t, p); };
+        listeners.add(l);
+        room();
+        return () => listeners.delete(l);
+      },
+
+      // Photos are compressed JPEG data URLs in the photos table.
+      async uploadPhoto(blob) {
+        const data = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+        const c = await client();
+        return check(await c.from("photos").insert({ household_id: key(), data }).select("id").single()).id;
+      },
+      async photoUrls(paths) {
+        const ids = paths.filter(Boolean);
+        if (!ids.length) return {};
+        const c = await client();
+        const rows = check(await c.from("photos").select("id, data").in("id", ids));
+        const out = {};
+        rows.forEach((r) => { out[r.id] = r.data; });
+        return out;
+      },
+      async removePhoto(id) { if (!id) return; const c = await client(); try { check(await c.from("photos").delete().eq("id", id)); } catch (e) { console.warn(e); } },
       _setProfile(p) { profile = p; },
     };
   }
@@ -263,7 +386,7 @@
     };
   }
 
-  const backend = cfg.API_URL ? apiBackend() : demoBackend();
+  const backend = cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY ? supabaseBackend() : cfg.API_URL ? apiBackend() : demoBackend();
 
   /* ------------------------------------------------------------------ */
   /* Shared helpers on top of the backend                                */

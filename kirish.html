@@ -115,7 +115,7 @@ function whoView(ctx) {
   view.innerHTML = `<p style="text-align:center;margin:0 0 14px"><b>${esc(ctx.household.name)}</b> — bu telefon kimniki?</p>
     <div class="who">${members.map((m) => `<button data-id="${m.id}">${App.avatar(m)}${esc(m.full_name)}<span class="small muted" style="font-weight:400">${m.role === "er" ? "Er" : "Xotin"}</span></button>`).join("")}</div>
     <p class="hint" style="text-align:center;margin-top:18px">Telefon buni eslab qoladi — keyin bu savol berilmaydi.</p>
-    ${Store.mode === "demo" ? `<p class="hint" style="text-align:center">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefonni ulash uchun js/config.js ga Cloudflare Worker manzilini yozing.</p>` : ""}`;
+    ${Store.mode === "demo" ? `<p class="hint" style="text-align:center">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefonni ulash uchun js/config.js ga Supabase manzili va kalitini yozing.</p>` : ""}`;
   $$("[data-id]", view).forEach((b) => b.addEventListener("click", () => { Store.chooseMe(b.dataset.id); location.href = "index.html"; }));
 }
 

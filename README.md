@@ -19,28 +19,33 @@ There is **no sign-in**. The site is for one family only:
 | `uy-ishlari.html` | Uy ishlari: today / upcoming / completed, assignee, priority, reminders |
 | `kirish.html` | First-time setup, the family link, and "whose phone is this?" |
 
-Shared code is in `css/app.css`, `js/app.js` (shell, tab bar, sheets, notifications) and `js/store.js` (data layer). The server code is `cloudflare/worker.js`.
+Shared code is in `css/app.css`, `js/app.js` (shell, tab bar, sheets, notifications) and `js/store.js` (data layer). The database setup is `supabase/schema.sql`.
 
-## Setup (free, one time, all in the browser)
+## Setup with Supabase (free, one time)
 
-The data lives in a free **Cloudflare D1** database, reached through a small Cloudflare **Worker** (`cloudflare/worker.js`). The Worker creates its tables by itself, so there's no SQL to run.
+1. In [supabase.com](https://supabase.com), create a new project. The free plan is enough.
+2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, and press **Run**.
+3. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into `js/config.js` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+4. Host the site folder as static files. GitHub Pages, Netlify or Cloudflare Pages are all free.
+5. On the first phone, open the site, enter both names, and tap **Oilani boshlash**. Then tap **Havolani yuborish** to send the family link to your partner. You can share the link again later from the avatars at the top right.
 
-1. Sign up for free at [dash.cloudflare.com](https://dash.cloudflare.com/sign-up).
-2. **Create the database:** go to *Storage & Databases → D1 SQL Database → Create*, name it `oila`, and create it.
-3. **Create the Worker:** go to *Compute (Workers) → Workers & Pages → Create → Start with Hello World*, name it `oila-uchun`, and click **Deploy**.
-4. Click **Edit code**, delete everything, paste the whole of `cloudflare/worker.js`, and click **Deploy**.
-5. **Connect the database:** open the Worker's *Bindings* tab (or *Settings → Bindings*), click **Add binding → D1 database**, set the variable name to `DB`, choose `oila`, and save.
-6. Copy the Worker's address (like `https://oila-uchun.yourname.workers.dev`) into `API_URL` in `js/config.js`. Opening that address in a browser should show `{"ok":true,"app":"Oila Uchun"}`.
-7. Host the site folder as static files. GitHub Pages, Netlify or Cloudflare Pages are all free.
-8. On the first phone, open the site, enter both names, and tap **Oilani boshlash**. Then tap **Havolani yuborish** to send the family link to your partner. You can share the link again later from the avatars at the top right.
+Changes reach the other phone right away through Supabase Realtime broadcast. Memory photos are compressed and saved in the `photos` table, so no Storage bucket is needed. The free plan's 500 MB database holds a couple of thousand photos.
 
-The free plan's daily limits (about 100,000 Worker requests and 100,000 database writes) are far more than one family uses. Changes reach the other phone within about 4 seconds.
+Note: Supabase pauses free projects after about a week with no use. A family that opens the site every few days keeps it active, and a paused project can be restored from the dashboard.
 
 ## Privacy
 
-- The family link contains a long random key: `kirish.html#k=<key>`. The Worker refuses any request without a matching key and only ever reads or writes that family's rows and photos. Without the link, nothing can be read.
+- The family link contains a long random key: `kirish.html#k=<key>`. The site sends it with every request as the `x-family-key` header, and Row Level Security only returns rows whose `household_id` equals it. Without the link, every table looks empty.
 - **Treat the link like a house key: share it only with your partner.** Anyone who has it can open the family's data.
 - The **Uzish** button in the family sheet disconnects a phone. The data stays, and the link reconnects it.
+
+## Alternative: Cloudflare Worker + D1
+
+If you'd rather not use Supabase, `cloudflare/worker.js` provides the same backend on Cloudflare's free plan:
+1. Create a D1 database named `oila`.
+2. Create a Worker, paste the file into it, and deploy.
+3. Add a D1 binding named `DB` that points to `oila`.
+4. Put the Worker address into `API_URL` in `js/config.js`, and leave the Supabase fields empty.
 
 ## Notifications
 
@@ -48,4 +53,4 @@ Every action writes an activity entry and a notification for the partner. These 
 
 ## Demo mode
 
-If `js/config.js` has no `API_URL`, the app runs in **demo mode**: data is stored in that browser only, with sample items. Two tabs in the same browser stay in sync, so you can try it as both people. Real use between two phones needs the Worker (see Setup).
+If `js/config.js` has no Supabase values, the app runs in **demo mode**: data is stored in that browser only, with sample items. Two tabs in the same browser stay in sync, so you can try it as both people. Real use between two phones needs Supabase (see Setup).

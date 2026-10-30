@@ -238,7 +238,7 @@
         <div class="section"><div class="section-head"><h2>${esc(c.household.name)}</h2></div>
           <button class="btn ghost block" data-share><i data-lucide="link"></i>Oila havolasini yuborish</button>
           <p class="hint" style="margin:8px 2px 0">Ikkinchi telefonni ulash uchun shu havolani juftingizga yuboring. Havolani boshqa hech kimga bermang — u oilangiz sahifasining kaliti.</p></div>
-        ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefon o'rtasida ulashish uchun js/config.js ga Cloudflare Worker manzilini yozing.</p>` : ""}`,
+        ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefon o'rtasida ulashish uchun js/config.js ga Supabase manzili va kalitini yozing.</p>` : ""}`,
       foot: `${c.partner ? `<button class="btn ghost" data-switch><i data-lucide="repeat"></i>Men ${esc(firstName(c.partner))}man</button>` : ""}<button class="btn danger" data-out><i data-lucide="unplug"></i>Uzish</button>`,
       onMount(el, api) {
         $("[data-share]", el).addEventListener("click", shareFamilyLink);

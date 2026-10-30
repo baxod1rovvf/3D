@@ -1,8 +1,12 @@
 // Oila Uchun — settings.
-// Paste the address of your free Cloudflare Worker here (see README), for example:
-//   API_URL: "https://oila-uchun.yourname.workers.dev",
-// The address is not a secret; the family's private key lives only in the family link.
-// If it is empty, the app runs in "Demo rejim" (data stays in this browser only).
+// Supabase: Project Settings → API → copy "Project URL" and the "anon public" key here,
+// after running supabase/schema.sql in the SQL Editor (see README).
+// These two values are not secrets; the family's private key lives only in the family link.
+// If they are empty, the app runs in "Demo rejim" (data stays in this browser only).
 window.OILA_CONFIG = {
+  SUPABASE_URL: "",
+  SUPABASE_ANON_KEY: "",
+
+  // Optional alternative instead of Supabase: a Cloudflare Worker address (cloudflare/worker.js).
   API_URL: "",
 };
