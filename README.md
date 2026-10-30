@@ -19,32 +19,27 @@ There is **no sign-in**. The site is for one family only:
 | `uy-ishlari.html` | Uy ishlari: today / upcoming / completed, assignee, priority, reminders |
 | `kirish.html` | First-time setup, the family link, and "whose phone is this?" |
 
-Shared code is in `css/app.css`, `js/app.js` (shell, tab bar, sheets, notifications) and `js/store.js` (data layer).
+Shared code is in `css/app.css`, `js/app.js` (shell, tab bar, sheets, notifications) and `js/store.js` (data layer). The server code is `cloudflare/worker.js`.
 
-## Setup (free, one time)
+## Setup (free, one time, all in the browser)
 
-The data is stored in a free [InstantDB](https://instantdb.com) app so both phones can share it.
+The data lives in a free **Cloudflare D1** database, reached through a small Cloudflare **Worker** (`cloudflare/worker.js`). The Worker creates its tables by itself, so there's no SQL to run.
 
-1. Create a free account and an app at [instantdb.com/dash](https://instantdb.com/dash), then copy the **App ID**.
-2. Push the database schema and access rules (`instant.schema.ts`, `instant.perms.ts`) from this folder. This needs Node.js:
-   ```bash
-   npm install
-   ```
-   ```bash
-   npx instant-cli login
-   ```
-   ```bash
-   npx instant-cli push all --app YOUR_APP_ID
-   ```
-3. Put the App ID into `INSTANT_APP_ID` in `js/config.js`. The App ID isn't a secret.
-4. Host the folder as static files. GitHub Pages and Netlify are both free.
-5. On the first phone, open the site, enter both names, and tap **Oilani boshlash**. Then tap **Havolani yuborish** to send the family link to your partner. You can share the link again later from the avatars at the top right.
+1. Sign up for free at [dash.cloudflare.com](https://dash.cloudflare.com/sign-up).
+2. **Create the database:** go to *Storage & Databases → D1 SQL Database → Create*, name it `oila`, and create it.
+3. **Create the Worker:** go to *Compute (Workers) → Workers & Pages → Create → Start with Hello World*, name it `oila-uchun`, and click **Deploy**.
+4. Click **Edit code**, delete everything, paste the whole of `cloudflare/worker.js`, and click **Deploy**.
+5. **Connect the database:** open the Worker's *Bindings* tab (or *Settings → Bindings*), click **Add binding → D1 database**, set the variable name to `DB`, choose `oila`, and save.
+6. Copy the Worker's address (like `https://oila-uchun.yourname.workers.dev`) into `API_URL` in `js/config.js`. Opening that address in a browser should show `{"ok":true,"app":"Oila Uchun"}`.
+7. Host the site folder as static files. GitHub Pages, Netlify or Cloudflare Pages are all free.
+8. On the first phone, open the site, enter both names, and tap **Oilani boshlash**. Then tap **Havolani yuborish** to send the family link to your partner. You can share the link again later from the avatars at the top right.
+
+The free plan's daily limits (about 100,000 Worker requests and 100,000 database writes) are far more than one family uses. Changes reach the other phone within about 4 seconds.
 
 ## Privacy
 
-- The family link contains a long random key: `kirish.html#k=<key>`. Every read and write sends that key, and the rules only return records whose `household_id` matches it. Without the link, nothing can be read.
+- The family link contains a long random key: `kirish.html#k=<key>`. The Worker refuses any request without a matching key and only ever reads or writes that family's rows and photos. Without the link, nothing can be read.
 - **Treat the link like a house key: share it only with your partner.** Anyone who has it can open the family's data.
-- Photos are stored under `<key>/…`, and seeing or deleting one needs the key. File uploads can't carry the key, so anyone with the App ID could upload a file; they still couldn't see yours.
 - The **Uzish** button in the family sheet disconnects a phone. The data stays, and the link reconnects it.
 
 ## Notifications
@@ -53,4 +48,4 @@ Every action writes an activity entry and a notification for the partner. These 
 
 ## Demo mode
 
-If `js/config.js` has no App ID, the app runs in **demo mode**: data is stored in that browser only, with sample items. Two tabs in the same browser stay in sync, so you can try it as both people. Real use between two phones needs the App ID.
+If `js/config.js` has no `API_URL`, the app runs in **demo mode**: data is stored in that browser only, with sample items. Two tabs in the same browser stay in sync, so you can try it as both people. Real use between two phones needs the Worker (see Setup).

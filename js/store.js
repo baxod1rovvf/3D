@@ -4,9 +4,9 @@
  * (kirish.html#k=<key>). The partner opens that link once. Each phone remembers the key
  * and which of the two people it belongs to.
  *
- * Real backend: InstantDB (free). Every read and write sends the key as a rule parameter,
- * and instant.perms.ts only allows rows whose household_id equals that key.
- * Without an App ID in js/config.js, a demo backend keeps data in this browser only.
+ * Real backend: a free Cloudflare Worker + D1 database (cloudflare/worker.js). Every request
+ * sends the key, and the Worker only touches rows whose household_id equals it.
+ * Without API_URL in js/config.js, a demo backend keeps data in this browser only.
  */
 (function () {
   const cfg = window.OILA_CONFIG || {};
@@ -39,112 +39,93 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* InstantDB backend                                                   */
+  /* Cloudflare Worker + D1 backend (cloudflare/worker.js)               */
   /* ------------------------------------------------------------------ */
-  function instantBackend() {
-    let db, profile;
+  function apiBackend() {
+    const API = cfg.API_URL.replace(/\/+$/, "");
+    const POLL_MS = 4000;
+    let profile;
     const key = () => Device.key();
-    const rp = () => ({ ruleParams: { key: key() } });
-    const scope = (table) => (table === "notifications" ? { household_id: key(), recipient_id: profile.id } : { household_id: key() });
 
-    async function client() {
-      if (db) return db;
-      if (!window.instant) await loadScript("https://cdn.jsdelivr.net/npm/@instantdb/core@1.0.67/dist/standalone/index.umd.cjs");
-      db = window.instant.init({ appId: cfg.INSTANT_APP_ID });
-      return db;
+    async function call(path, { method = "GET", body, k = key(), raw } = {}) {
+      const headers = {};
+      if (k) headers["X-Family-Key"] = k;
+      if (body !== undefined && !raw) headers["Content-Type"] = "application/json";
+      const res = await fetch(API + path, { method, headers, body: raw ? body : body !== undefined ? JSON.stringify(body) : undefined });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { const e = new Error(data.error || `HTTP ${res.status}`); e.status = res.status; throw e; }
+      return data;
     }
-    async function q(query, k = key()) { const c = await client(); return (await c.queryOnce(query, { ruleParams: { key: k } })).data; }
-    const tx = (c, table, id, k = key()) => c.tx[table][id].ruleParams({ key: k });
-    // Instant rejects undefined values; keep nulls (they clear a field).
-    const clean = (o) => JSON.parse(JSON.stringify(o, (k, v) => (v === undefined ? null : v)));
+
+    // One shared poller: asks the Worker for per-table change counters and wakes subscribers.
+    const subscribers = new Set();
+    let versions = null, timer = null;
+    async function poll() {
+      if (document.hidden || !subscribers.size) return;
+      let next;
+      try { next = await call("/versions"); } catch (e) { return; }
+      const changed = versions ? Object.keys(next).filter((t) => next[t] !== versions[t]) : [];
+      versions = next;
+      changed.forEach((t) => subscribers.forEach((s) => s(t)));
+    }
+    function startPolling() {
+      if (timer) return;
+      poll();
+      timer = setInterval(poll, POLL_MS);
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+    }
 
     return {
-      mode: "instant",
+      mode: "api",
       async family(k = key()) {
         if (!k) return null;
-        const data = await q({ households: { $: { where: { id: k } } }, profiles: { $: { where: { household_id: k } } } }, k);
-        const household = data.households[0];
-        return household ? { household, members: data.profiles } : null;
+        try { return await call("/family", { k }); }
+        catch (e) { if (e.status === 404 || e.status === 401) return null; throw e; }
       },
       async createFamily({ familyName, wifeName, husbandName }) {
-        const c = await client();
-        const k = window.instant.id();
-        await c.transact([
-          tx(c, "households", k, k).update({ name: familyName, created_at: nowIso() }),
-          tx(c, "profiles", window.instant.id(), k).update({ household_id: k, full_name: wifeName, role: "xotin", created_at: nowIso() }),
-          tx(c, "profiles", window.instant.id(), k).update({ household_id: k, full_name: husbandName, role: "er", created_at: nowIso() }),
-        ]);
+        const { key: k } = await call("/family", { method: "POST", k: null, body: { name: familyName, members: [{ full_name: wifeName, role: "xotin" }, { full_name: husbandName, role: "er" }] } });
         Device.set("oila-family-key", k);
         return k;
       },
 
       async list(table, opts = {}) {
-        const data = await q({ [table]: { $: { where: scope(table) } } });
-        return sortRows(data[table], opts);
+        const qs = table === "notifications" ? `?recipient_id=${encodeURIComponent(profile.id)}` : "";
+        return sortRows(await call(`/rows/${table}${qs}`), opts);
       },
-      async insert(table, row) {
-        const c = await client();
-        const full = clean({ created_at: nowIso(), ...row, household_id: key() });
-        const id = window.instant.id();
-        await c.transact(tx(c, table, id).update(full));
-        return { id, ...full };
-      },
-      async insertMany(table, rows) {
-        const c = await client();
-        const out = rows.map((r) => ({ id: window.instant.id(), ...clean({ created_at: nowIso(), ...r, household_id: key() }) }));
-        await c.transact(out.map(({ id, ...r }) => tx(c, table, id).update(r)));
-        return out;
-      },
-      async update(table, id, patch) {
-        const c = await client();
-        const p = clean(patch);
-        delete p.household_id;
-        await c.transact(tx(c, table, id).update(p));
-        return { id, ...p };
-      },
+      async insert(table, row) { return (await call(`/rows/${table}`, { method: "POST", body: { rows: [{ created_at: nowIso(), ...row }] } }))[0]; },
+      async insertMany(table, rows) { return call(`/rows/${table}`, { method: "POST", body: { rows: rows.map((r) => ({ created_at: nowIso(), ...r })) } }); },
+      async update(table, id, patch) { await call(`/rows/${table}/${id}`, { method: "PATCH", body: { patch } }); return { id, ...patch }; },
       async updateWhere(table, match, patch) {
-        const c = await client();
-        const rows = (await this.list(table)).filter((r) => Object.keys(match).every((k) => r[k] === match[k]));
-        if (rows.length) await c.transact(rows.map((r) => tx(c, table, r.id).update(clean(patch))));
+        const ids = (await this.list(table)).filter((r) => Object.keys(match).every((k) => r[k] === match[k])).map((r) => r.id);
+        if (ids.length) await call(`/rows/${table}`, { method: "PATCH", body: { ids, patch } });
       },
-      async remove(table, id) { const c = await client(); await c.transact(tx(c, table, id).delete()); },
+      async remove(table, id) { await call(`/rows/${table}/${id}`, { method: "DELETE" }); },
 
       subscribe(tables, cb) {
-        // Instant pushes whole query results; diff ids so callers still see INSERTs.
-        const unsubs = tables.map((t) => {
-          let known = null;
-          return db.subscribeQuery({ [t]: { $: { where: scope(t) } } }, (resp) => {
-            if (resp.error || !resp.data) return;
-            const rows = resp.data[t];
-            if (known) {
-              rows.filter((r) => !known.has(r.id)).forEach((r) => cb(t, { eventType: "INSERT", new: r }));
-              cb(t, { eventType: "UPDATE", new: {} });
-            }
-            known = new Set(rows.map((r) => r.id));
-          }, rp());
-        });
-        return () => unsubs.forEach((u) => u());
+        // Diff ids per table so callers still see INSERT events (used for notification toasts).
+        const known = {};
+        tables.forEach(async (t) => { try { known[t] = new Set((await this.list(t)).map((r) => r.id)); } catch (e) {} });
+        const s = async (t) => {
+          if (!tables.includes(t)) return;
+          try {
+            const rows = await this.list(t);
+            if (known[t]) rows.filter((r) => !known[t].has(r.id)).forEach((r) => cb(t, { eventType: "INSERT", new: r }));
+            known[t] = new Set(rows.map((r) => r.id));
+          } catch (e) {}
+          cb(t, { eventType: "UPDATE", new: {} });
+        };
+        subscribers.add(s);
+        startPolling();
+        return () => subscribers.delete(s);
       },
 
-      async uploadPhoto(blob) {
-        const c = await client();
-        const path = `${key()}/${window.instant.id()}.jpg`;
-        await c.storage.uploadFile(path, blob, { contentType: "image/jpeg" });
-        return path;
-      },
+      async uploadPhoto(blob) { return (await call("/photos", { method: "POST", body: blob, raw: true })).id; },
       async photoUrls(paths) {
-        const list = paths.filter(Boolean);
-        if (!list.length) return {};
-        const files = (await q({ $files: { $: { where: { path: { $in: list } } } } })).$files;
         const out = {};
-        files.forEach((f) => { out[f.path] = f.url; });
+        paths.filter(Boolean).forEach((p) => { out[p] = `${API}/photos/${encodeURIComponent(p)}?k=${encodeURIComponent(key())}`; });
         return out;
       },
-      async removePhoto(path) {
-        if (!path) return;
-        const c = await client();
-        try { await c.transact(tx(c, "$files", window.instant.lookup("path", path)).delete()); } catch (e) { console.warn(e); }
-      },
+      async removePhoto(path) { if (path) try { await call(`/photos/${encodeURIComponent(path)}`, { method: "DELETE" }); } catch (e) { console.warn(e); } },
       _setProfile(p) { profile = p; },
     };
   }
@@ -282,7 +263,7 @@
     };
   }
 
-  const backend = cfg.INSTANT_APP_ID ? instantBackend() : demoBackend();
+  const backend = cfg.API_URL ? apiBackend() : demoBackend();
 
   /* ------------------------------------------------------------------ */
   /* Shared helpers on top of the backend                                */
