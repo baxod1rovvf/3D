@@ -86,11 +86,11 @@
   // Category fallbacks when no word matches
   const CATEGORY = {
     sabzavot: "🥬",
-    meva: "🍇",
-    sut: "🥛",
-    gosht: "🥩",
-    non: "🍞",
-    ichimlik: "🥤",
+    meva: "🍓",
+    sut: "🧀",
+    gosht: "🍖",
+    non: "🥖",
+    ichimlik: "🧃",
     uy: "🧴",
     boshqa: "🛒",
   };
@@ -103,10 +103,15 @@
       .trim();
   }
 
-  // Flat index, longest word first
+  // Generic words lose to any specific product ("tovuq go'shti" -> chicken)
+  const GENERIC = new Set(["go'sht", "gosht", "мясо", "meat"]);
+
+  // Flat index: specific words first, then longest word first
   const INDEX = [];
-  LIST.forEach((g) => g.words.forEach((w) => INDEX.push({ w: normalize(w), emoji: g.emoji })));
-  INDEX.sort((a, b) => b.w.length - a.w.length);
+  LIST.forEach((g) => g.words.forEach((w) => {
+    INDEX.push({ w: normalize(w), emoji: g.emoji, generic: GENERIC.has(normalize(w)) });
+  }));
+  INDEX.sort((a, b) => (a.generic - b.generic) || (b.w.length - a.w.length));
 
   function forName(name, category) {
     const n = normalize(name);

@@ -39,3 +39,14 @@ test("list size and unique words", () => {
     }
   }
 });
+
+test("category fallbacks", () => {
+  const want = { sabzavot: "🥬", meva: "🍓", sut: "🧀", gosht: "🍖", non: "🥖", ichimlik: "🧃", uy: "🧴", boshqa: "🛒" };
+  for (const [c, e] of Object.entries(want)) assert.strictEqual(S.forName("xyz", c), e, c);
+});
+
+test("specific product beats generic word", () => {
+  assert.strictEqual(S.forName("Tovuq go'shti"), "🍗");
+  assert.strictEqual(S.forName("go'sht"), "🥩");
+  assert.strictEqual(S.forName("olma sharbati"), "🧃");
+});
