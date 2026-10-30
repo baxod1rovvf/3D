@@ -142,7 +142,7 @@
 
     // The family key travels as a header; Row Level Security compares it with household_id.
     async function client(k = key()) {
-      if (!window.supabase) await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js");
+      if (!window.supabase) await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0/dist/umd/supabase.js");
       if (!clients[k]) clients[k] = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
         auth: { persistSession: false, autoRefreshToken: false },
         global: { headers: { "x-family-key": k || "" } },
