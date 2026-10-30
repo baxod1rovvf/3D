@@ -320,8 +320,19 @@
     if ((await Notification.requestPermission()) !== "granted") return false;
     const reg = await navigator.serviceWorker.ready;
     const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(key) }));
-    await Store.savePushSubscription(sub.toJSON());
+    try { await Store.savePushSubscription(sub.toJSON()); }
+    catch (e) { try { await sub.unsubscribe(); } catch (e2) {} throw e; }
     return true;
+  }
+  /** Non-fatal: point this browser's existing push subscription at another person (after "Men ...man"). */
+  async function rebindPush(profile) {
+    try {
+      if (!pushSupported()) return;
+      const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+      if (!sub) return;
+      Store._setProfile(profile);
+      await Store.savePushSubscription(sub.toJSON());
+    } catch (e) { console.warn("push rebind", e); }
   }
   async function disablePush() {
     const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
@@ -330,6 +341,7 @@
     await sub.unsubscribe();
     try { await Store.deletePushSubscription(endpoint); } catch (e) { console.warn(e); }
   }
+  const disablePushQuietly = async () => { try { if (pushSupported()) await disablePush(); } catch (e) { console.warn("push off", e); } };
 
   function openProfile() {
     const c = Store.ctx;
@@ -392,8 +404,7 @@
           refreshPush();
         });
         $("[data-push-test]", el).addEventListener("click", async () => {
-          await Store.notify("test", {}, null, { toSelf: true });
-          toast("Sinov xabari yuborildi", "send");
+          try { await Store.notify("test", {}, null, { toSelf: true }); toast("Sinov xabari yuborildi", "send"); } catch (e) { fail(e); }
         });
 
         // Meal times (family) and reminder lead (this person).
@@ -420,10 +431,11 @@
         $("[data-out]", el).addEventListener("click", async () => {
           api.close();
           if (!(await confirmSheet("Bu telefon oiladan uziladi. Ma'lumotlar o'chmaydi — juftingiz bergan kod bilan qayta ulanish mumkin.", "Telefonni uzish"))) return;
+          await disablePushQuietly();
           Store.forgetDevice(); location.href = "kirish.html";
         });
         const sw = $("[data-switch]", el);
-        if (sw) sw.addEventListener("click", () => { Store.chooseMe(c.partner.id); location.reload(); });
+        if (sw) sw.addEventListener("click", async () => { Store.chooseMe(c.partner.id); await rebindPush(c.partner); location.reload(); });
       },
     });
   }

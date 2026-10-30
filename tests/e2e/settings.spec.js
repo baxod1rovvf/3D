@@ -87,6 +87,38 @@ const SHOT = "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42/s
   await p2.waitForSelector("[data-push-row]");
   assert.ok((await p2.textContent("[data-push-row]")).includes("Bu brauzer bildirishnomalarni qo'llamaydi"));
 
+  // Push subscription follows the person / is removed on disconnect (fake pushManager + store spies).
+  const p3 = track(await ctx.newPage());
+  await p3.addInitScript(() => {
+    const sub = { endpoint: "https://push.example/abc", toJSON() { return { endpoint: this.endpoint, keys: {} }; }, unsubscribe() { window.__unsub = (window.__unsub || 0) + 1; return Promise.resolve(true); } };
+    const reg = { pushManager: { getSubscription: () => Promise.resolve(window.__unsub ? null : sub), subscribe: () => Promise.resolve(sub) } };
+    Object.defineProperty(navigator.serviceWorker, "ready", { get: () => Promise.resolve(reg) });
+    window.__calls = JSON.parse(sessionStorage.getItem("__calls") || "[]");
+  });
+  await p3.goto(BASE + "/index.html");
+  await p3.waitForFunction(() => window.Store && Store.ctx);
+  await p3.evaluate(() => {
+    const log = (c) => { window.__calls.push(c); sessionStorage.setItem("__calls", JSON.stringify(window.__calls)); };
+    Store.savePushSubscription = async (s) => log(["save", s.endpoint, Store.Device.me()]);
+    Store.deletePushSubscription = async (e) => log(["del", e]);
+  });
+  await p3.click("#settings-btn");
+  await p3.click("[data-switch]");
+  await p3.waitForLoadState("load");
+  await p3.waitForFunction(() => window.Store && Store.ctx && Store.ctx.profile.id === "u-er");
+  const c1 = await p3.evaluate(() => JSON.parse(sessionStorage.getItem("__calls")));
+  assert.deepStrictEqual(c1, [["save", "https://push.example/abc", "u-er"]]);
+  await p3.evaluate(() => {
+    const log = (c) => { window.__calls.push(c); sessionStorage.setItem("__calls", JSON.stringify(window.__calls)); };
+    Store.deletePushSubscription = async (e) => log(["del", e]);
+  });
+  await p3.click("#settings-btn");
+  await p3.click("[data-out]");
+  await p3.click(".sheet .btn.danger, .sheet [data-ok], .sheet .btn.primary");
+  await p3.waitForURL("**/kirish.html");
+  const c2 = await p3.evaluate(() => JSON.parse(sessionStorage.getItem("__calls")));
+  assert.deepStrictEqual(c2[c2.length - 1], ["del", "https://push.example/abc"]);
+
   await browser.close();
   assert.deepStrictEqual(errors, []);
   console.log("settings.spec OK");
