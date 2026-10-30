@@ -75,3 +75,31 @@ test("endings counts", () => {
     }
   }
 });
+
+function endingsOf(type, role) {
+  const seen = new Set();
+  for (let i = 0; i < 100; i++) {
+    const m = M.build(type, { ...DATA, actorRole: role }, () => i / 100);
+    seen.add(m.body.slice(m.fixed.length + 3));
+  }
+  return seen;
+}
+
+test("endings are specific to each type and role", () => {
+  assert.ok(endingsOf("grocery_need", "xotin").has("do'kondan qaytishda olib keling 🥛"));
+  assert.ok(endingsOf("grocery_bought", "er").has("rahmat aytishni unutmang 😊"));
+  assert.ok(endingsOf("task_done", "xotin").has("zo'r! 👏"));
+  assert.ok(endingsOf("tasks_all_done", "xotin").has("unga shokolad olib keling 🍫"));
+  assert.ok(endingsOf("tasks_all_done", "er").has("unga mazali choy damlab bering ☕"));
+  const need = endingsOf("grocery_need", "xotin");
+  const all = endingsOf("tasks_all_done", "xotin");
+  assert.ok([...need].every((e) => !all.has(e)));
+  assert.ok(!endingsOf("grocery_bought", "er").has("unga mazali choy damlab bering ☕"));
+});
+
+test("missing data never yields undefined", () => {
+  for (const type of Object.keys(EMOJI)) {
+    const m = M.build(type, {}, () => 0);
+    assert.ok(!/undefined|NaN|null/.test(m.body), type + ": " + m.body);
+  }
+});
