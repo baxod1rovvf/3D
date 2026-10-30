@@ -30,7 +30,7 @@ const track = (p, errors) => { p.on("pageerror", (e) => errors.push("pageerror: 
   assert.ok(scope.endsWith("/"), "scope " + scope);
   await page.evaluate(() => navigator.serviceWorker.ready);
   const caches1 = await page.evaluate(async () => caches.keys());
-  assert.ok(caches1.includes("oila-v1"), "cache oila-v1 missing: " + caches1);
+  assert.ok(caches1.includes("oila-v2"), "cache oila-v2 missing: " + caches1);
 
   // Manifest icons.
   const manifestHref = await page.evaluate(() => document.querySelector('link[rel="manifest"]').href);
@@ -74,7 +74,7 @@ const track = (p, errors) => { p.on("pageerror", (e) => errors.push("pageerror: 
   assert.strictEqual(await sa.evaluate(() => App.installState()), "installed");
 
   // Network passthrough: the SW must not cache supabase or non-GET (checked via cache contents).
-  const keys = await page.evaluate(async () => (await (await caches.open("oila-v1")).keys()).map((r) => r.url));
+  const keys = await page.evaluate(async () => (await (await caches.open("oila-v2")).keys()).map((r) => r.url));
   assert.ok(keys.length > 0 && keys.every((u) => !/supabase\.co/.test(u) && !/unpkg|googleapis/.test(u)), "bad cache entries: " + keys);
 
   // Offline: a visited page still opens from cache.

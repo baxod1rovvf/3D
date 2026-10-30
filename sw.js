@@ -1,5 +1,5 @@
 /* Oila Uchun service worker: offline app shell, plus Web Push display. All URLs are relative to the SW scope. */
-const CACHE = "oila-v1";
+const CACHE = "oila-v2";
 const SHELL = [
   "./", "index.html", "rozgor.html", "taomlar.html", "xotiralar.html", "uy-ishlari.html", "kirish.html",
   "css/app.css", "js/stickers.js", "js/messages.js", "js/reminders.js", "js/store.js", "js/app.js",
@@ -29,6 +29,10 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(fetch(req).then(put).catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match("index.html"))));
     return;
   }
+  if (/\/(js|css)\/[^/]+$/.test(url.pathname)) { // code and styles: network-first too, so a deploy shows up at once
+    e.respondWith(fetch(req).then(put).catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || Response.error())));
+    return;
+  }
   // Cache-first, refreshed in the background for the next visit.
   e.respondWith(caches.match(req).then((hit) => {
     const net = fetch(req).then(put).catch(() => hit);
@@ -39,6 +43,7 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
+  d = d || {}; // a literal JSON null payload
   e.waitUntil(self.registration.showNotification(d.title || "Oila Uchun", {
     body: d.body || "",
     tag: d.tag,
@@ -54,7 +59,12 @@ self.addEventListener("notificationclick", (e) => {
   const target = new URL((e.notification.data && e.notification.data.url) || "index.html", self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
     const open = list.find((c) => c.url.startsWith(self.registration.scope));
-    if (open) return open.focus();
+    if (open) { // focus first (needs the click's user activation), then move it to the notification's page
+      return open.focus().then((c) => {
+        const w = c || open;
+        return w.url !== target && "navigate" in w ? w.navigate(target).catch(() => w) : w;
+      });
+    }
     return self.clients.openWindow(target);
   }));
 });

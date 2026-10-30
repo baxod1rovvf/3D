@@ -53,7 +53,15 @@ If you'd rather not use Supabase, `cloudflare/worker.js` provides the same backe
 
 ## Notifications
 
-Every action writes an activity entry and a notification for the partner. These show live in the in-app notification centre (bell, unread count, mark as read). If allowed, they also appear as system notifications while the site is open in the background. Push to a closed browser would need a service worker and a push server; that isn't included.
+Every action writes an activity entry and a notification for the partner. These show live in the in-app notification centre (bell, unread count, mark as read).
+
+**Phone notifications (push), even when the site is closed.** One time, after running `schema.sql`:
+1. In Supabase open **Edge Functions → Deploy a new function → Via Editor**, name it `push`, paste the whole of `supabase/functions/push/index.ts`, turn **Verify JWT** off, and deploy.
+2. On each phone, open **Sozlamalar** and turn notifications on (on iPhone, add the site to the Home Screen first).
+
+Each new notification row is sent to the recipient's phones. Every 5 minutes, `pg_cron` asks the function for meal reminders (the time per meal is in Sozlamalar; each person chooses 0–3 hours before). The function makes its own push keys on first use and keeps them in `push_keys`, which the site can't read.
+
+To change the function, edit `supabase/functions/push/template.ts` or `js/messages.js`, `js/reminders.js`, `js/push-logic.js`, then run `node tools/build-push.mjs` to regenerate `index.ts`.
 
 ## Demo mode
 

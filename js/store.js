@@ -217,13 +217,13 @@
       },
       async insert(table, row) {
         const c = await client();
-        const r = check(await c.from(table).insert({ ...dbRow(table, row), household_id: key() }).select().single());
+        const r = check(await c.from(table).insert({ ...row, household_id: key() }).select().single());
         announce(table, { eventType: "INSERT", new: r });
         return r;
       },
       async insertMany(table, rows) {
         const c = await client();
-        const out = check(await c.from(table).insert(rows.map((r) => ({ ...dbRow(table, r), household_id: key() }))).select());
+        const out = check(await c.from(table).insert(rows.map((r) => ({ ...r, household_id: key() }))).select());
         announce(table, { eventType: "UPDATE", new: {} });
         return out;
       },
@@ -315,13 +315,6 @@
   /* ------------------------------------------------------------------ */
   /* Demo backend (preview only, data stays in this browser)             */
   /* ------------------------------------------------------------------ */
-  // Supabase schema (until Task 8) has no type/title/body/tag columns: send only known notification fields.
-  function dbRow(table, row) {
-    if (table !== "notifications") return row;
-    const { recipient_id, actor_id, module, text, link, read } = row;
-    return { recipient_id, actor_id, module, text, link, read };
-  }
-
   function demoBackend() {
     const KEY = "oila-demo-db-v2";
     const bc = "BroadcastChannel" in window ? new BroadcastChannel("oila-demo") : null;
