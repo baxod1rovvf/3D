@@ -373,7 +373,33 @@
     setInterval(checkReminders, 60000);
   }
 
+  /* ---------- installable app ---------- */
+  let installEvent = null;
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvent = e; });
+  window.addEventListener("appinstalled", () => { installEvent = null; });
+  const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+  /** "installed" | "prompt" (browser can show its install dialog) | "ios" (Share > Add to Home Screen) | "unsupported" */
+  function installState() {
+    if (isStandalone()) return "installed";
+    if (installEvent) return "prompt";
+    if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return "ios";
+    return "unsupported";
+  }
+  /** Shows the browser install dialog; resolves "accepted" | "dismissed" | "unavailable". */
+  async function install() {
+    if (!installEvent) return "unavailable";
+    const ev = installEvent;
+    installEvent = null;
+    await ev.prompt();
+    const choice = await ev.userChoice;
+    return choice ? choice.outcome : "dismissed";
+  }
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch((e) => console.warn("sw", e)));
+  }
+
   window.App = {
+    installState, install,
     boot, sheet, showPairCode, enterPairCode, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
     person, nameOf, firstName, isMe, avatar, timeAgo, greeting,
     ymd, parseYmd, today, addDays, fmtLong, fmtDate, fmtShort,
