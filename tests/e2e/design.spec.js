@@ -99,14 +99,22 @@ const PAGES = [
   await page.selectOption("#g-cat", "meva");
   await page.click(".sheet [data-save]");
   await page.waitForTimeout(300);
+  // A redraw re-creates the CSS animation, so its currentTime alone restarts at 0. The effective
+  // progress is currentTime minus the (negative) delay: resumed ≈ 300ms, restarted ≈ 180ms.
   const wob = await page.evaluate(() => {
     const r = [...document.querySelectorAll(".g-row")].find((x) => x.textContent.includes("Qulupnay"));
     if (!r) return null;
     const a = r.getAnimations().find((x) => x.animationName === "wobble-in");
-    return { cls: r.classList.contains("wobble-in"), t: a ? a.currentTime : null };
+    return {
+      cls: r.classList.contains("wobble-in"),
+      state: a ? a.playState : null,
+      progress: a ? a.currentTime - a.effect.getTiming().delay : null,
+    };
   });
+  console.log("wobble-in at ~300ms:", JSON.stringify(wob));
   assert.ok(wob && wob.cls, "new row keeps .wobble-in ~300ms after save: " + JSON.stringify(wob));
-  assert.ok(wob.t !== null && wob.t >= 200, "wobble-in resumed, not restarted: " + JSON.stringify(wob));
+  assert.strictEqual(wob.state, "running", "wobble-in running: " + JSON.stringify(wob));
+  assert.ok(wob.progress >= 250, "wobble-in resumed (progress >= 250ms), not restarted: " + JSON.stringify(wob));
   await page.emulateMedia({ reducedMotion: "reduce" });
 
   // Taomlar: ingredient chips carry stickers.
