@@ -415,3 +415,19 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Phones: keep the tab bar pinned to the screen ----------
+   Mobile browsers resize the viewport while their address bar slides in and out, which
+   could push the in-flow tab bar below the screen. On phones the page itself never scrolls
+   (only .main does) and the tab bar is fixed to the bottom edge. */
+@media (max-width: 599px) {
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  .app { height: 100%; }
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    max-width: 440px; margin: 0 auto;
+  }
+  .main { padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 24px); }
+  .app:has(.fab) .main { padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 100px); }
+  .fab { position: fixed; z-index: 41; }
+}
