@@ -226,13 +226,23 @@
   /** HTML for a code box; the caller fills it with Store.createPairCode(). */
   const codeDigits = (code) => `<div class="pair-code" aria-label="Ulash kodi ${esc(code.split("").join(" "))}">${code.split("").map((d) => `<span>${esc(d)}</span>`).join("")}</div>`;
 
+  /** Explain a pairing failure: missing server setup, unknown family, too many tries, or the network. */
+  function pairError(e, prefix) {
+    const m = `${(e && e.code) || ""} ${(e && e.message) || e || ""}`;
+    if (/too_many/.test(m)) return "Juda ko'p urinish bo'ldi. 10 daqiqadan so'ng qayta urinib ko'ring.";
+    if (/PGRST202|could not find the function|pair_code/i.test(m)) return `${prefix} Serverda ulash funksiyasi yo'q: Supabase → SQL Editor'da supabase/pairing.sql ni ishga tushiring.`;
+    if (/family_not_found/.test(m)) return `${prefix} Bu telefonning oilasi serverda topilmadi. Sozlamalar → Uzish, so'ng oilani qaytadan boshlang.`;
+    if (/fetch|network|Failed to/i.test(m)) return `${prefix} Internetni tekshirib, qayta urinib ko'ring.`;
+    return `${prefix} Server xatosi: ${String((e && e.message) || e).slice(0, 120)}`;
+  }
+
   /** "Qurilmani ulash": show a 6-digit code the partner types on their phone. */
   async function showPairCode(target) {
     const render = async (box) => {
       box.innerHTML = `<div class="skeleton" style="height:64px;margin:6px 0"></div>`;
       let code;
       try { code = await Store.createPairCode(); }
-      catch (e) { console.error(e); box.innerHTML = `<p class="error-text">Kod olinmadi. Internetni tekshirib, qayta urinib ko'ring.</p>`; return; }
+      catch (e) { console.error(e); box.innerHTML = `<p class="error-text">${esc(pairError(e, "Kod olinmadi."))}</p>`; return; }
       box.innerHTML = `${codeDigits(code)}
         <p class="hint" style="text-align:center;margin:10px 0 0">Juftingiz o'z telefonida <b>«Menda kod bor»</b>ni bosib, shu kodni kiritadi. Kod 10 daqiqa va faqat bir marta ishlaydi.</p>
         <button class="link-btn" data-new style="display:block;margin:8px auto 0">Yangi kod olish</button>`;
@@ -274,7 +284,7 @@
           done && done(); onJoined ? onJoined() : (location.href = "kirish.html");
         } catch (ex) {
           console.error(ex);
-          err.textContent = /too_many/.test(ex.message || "") ? "Juda ko'p urinish bo'ldi. 10 daqiqadan so'ng qayta urinib ko'ring." : "Ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.";
+          err.textContent = pairError(ex, "Ulanib bo'lmadi.");
           err.hidden = false; btn.disabled = false;
         }
       });
