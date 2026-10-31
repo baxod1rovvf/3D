@@ -29,7 +29,7 @@ Do these steps in this order.
 
 1. **Create the project.** In [supabase.com](https://supabase.com), create a new project. The free plan is enough.
 2. **Connect the site.** Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into `js/config.js` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
-3. **Run the SQL.** Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, and press **Run**. It is safe to re-run. It adds the notification columns, the settings tables, pairing, the push trigger and the 5-minute meal timer. Supabase may ask to enable the `pg_net` and `pg_cron` extensions. The SQL enables them itself. If it says they are unavailable, enable them in **Database → Extensions** and run it again.
+3. **Run the SQL.** Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, and press **Run**. (If you already ran an older `schema.sql`, you can paste just `supabase/push.sql` instead: it holds only the notifications and meal-reminder part.) It is safe to re-run. It adds the notification columns, the settings tables, pairing, the push trigger and the 5-minute meal timer. Supabase may ask to enable the `pg_net` and `pg_cron` extensions. The SQL enables them itself. If it says they are unavailable, enable them in **Database → Extensions** and run it again.
    - `schema.sql` calls this project's push function at a fixed address: `https://anmpvewqxvvwzwewnlum.supabase.co/functions/v1/push` (twice: the notifications trigger and the meal timer). **If you use another Supabase project, replace that address with `https://<your-project>.supabase.co/functions/v1/push` before running it.**
 4. **Deploy the push function.**
    1. Open **Edge Functions → Deploy a new function → Via Editor**.
