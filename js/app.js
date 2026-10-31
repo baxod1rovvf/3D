@@ -266,8 +266,9 @@
         const btn = f.querySelector("button[type=submit]"); btn.disabled = true;
         try {
           const k = await Store.claimPairCode(code);
-          // Remove this phone's push subscription from the old family while its key is still active.
-          if (k) await withTimeout(disablePushQuietly());
+          // Drop the old family's server row while its key is still active. The browser stays subscribed:
+          // the next page boot files the same subscription under the new family.
+          if (k) await withTimeout(dropServerPushQuietly());
           if (!k || !(await Store.joinFamily(k))) { err.textContent = "Kod noto'g'ri yoki eskirgan. Juftingizdan yangi kod so'rang."; err.hidden = false; btn.disabled = false; return; }
           Store.Device.del("oila-me");
           done && done(); onJoined ? onJoined() : (location.href = "kirish.html");
@@ -288,7 +289,7 @@
     const row = (ico, title, meta, extra = "") => `<div class="row"><i data-lucide="${ico}"></i><div class="grow"><div class="title">${title}</div><div class="meta">${meta}</div></div>${extra}</div>`;
     if (st === "installed") return row("circle-check", "\u2705 O'rnatilgan", "Ilova telefoningizda ishlayapti");
     if (st === "prompt") return row("download", "Telefonga o'rnatish", "Bosh ekranda alohida ilova bo'ladi", `<button class="btn primary" data-install>O'rnatish</button>`);
-    if (st === "ios") return row("share", "Bosh ekranga qo'shing", "1) Pastdagi Ulashish \u2B06\uFE0F tugmasini bosing. 2) \u00ABBosh ekranga qo'shish\u00BB ni tanlang.");
+    if (st === "ios") return row("share", "Bosh ekranga qo'shing", "1) Pastdagi Ulashish \u2B06\uFE0F tugmasini bosing. 2) \u00ABBosh ekranga qo'shish\u00BB ni tanlang. 3) Ilovani bosh ekrandan oching \u2014 uning xotirasi alohida, shuning uchun ichida \u00ABMenda kod bor\u00BB orqali qayta ulang (yoki oilani o'sha yerda boshlang).");
     return row("info", "O'rnatish", "Brauzer menyusidan \u00ABIlovani o'rnatish\u00BB yoki \u00ABBosh ekranga qo'shish\u00BB ni tanlang.");
   }
 
@@ -299,15 +300,27 @@
   };
   const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
-  /** { state: "unsupported"|"blocked"|"noserver"|"on"|"off", key } for this phone. */
+  /** Resolves with the promise result, or undefined after ms (never hangs the caller). */
+  const withTimeout = (promise, ms = 3000) => Promise.race([promise, new Promise((res) => setTimeout(res, ms))]);
+  /** The service worker registration, or an error if it is not ready in time (e.g. registration failed). */
+  async function swReady(ms = 4000) {
+    const reg = await withTimeout(navigator.serviceWorker.ready, ms);
+    if (!reg) throw new Error("Service worker tayyor emas");
+    return reg;
+  }
+
+  /** { state: "unsupported"|"ios"|"blocked"|"noserver"|"on"|"off", key } for this phone. */
   async function pushStatus() {
-    if (!pushSupported()) return { state: "unsupported" };
+    // iPhone Safari only gets PushManager inside the installed (home-screen) app.
+    if (!pushSupported()) return { state: installState() === "ios" ? "ios" : "unsupported" };
     let key = null;
     try { key = await Store.pushPublicKey(); } catch (e) {}
     if (!key) return { state: "noserver" };
     if (Notification.permission === "denied") return { state: "blocked" };
+    let reg;
+    try { reg = await swReady(); } catch (e) { return { state: "unsupported" }; }
     let sub = null;
-    try { sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription(); } catch (e) {}
+    try { sub = await reg.pushManager.getSubscription(); } catch (e) {}
     return { state: sub && Notification.permission === "granted" ? "on" : "off", key };
   }
   const PUSH_TEXT = {
@@ -316,36 +329,58 @@
     blocked: "Bloklangan. Telefon sozlamalaridan shu sayt uchun bildirishnomalarga ruxsat bering.",
     noserver: "Server hali sozlanmagan. Bildirishnomalar keyinroq yoqiladi.",
     unsupported: "Bu brauzer bildirishnomalarni qo'llamaydi",
+    ios: "Avval ilovani bosh ekranga o'rnating, keyin shu yerdan yoqing.",
   };
 
   async function enablePush(key) {
     if ((await Notification.requestPermission()) !== "granted") return false;
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await swReady();
     const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(key) }));
     try { await Store.savePushSubscription(sub.toJSON()); }
     catch (e) { try { await sub.unsubscribe(); } catch (e2) {} throw e; }
     return true;
   }
-  /** Resolves with the promise result, or undefined after ms (never hangs the caller). */
-  const withTimeout = (promise, ms = 3000) => Promise.race([promise, new Promise((res) => setTimeout(res, ms))]);
   /** Non-fatal: point this browser's existing push subscription at another person (after "Men ...man"). */
   async function rebindPush(profile) {
     try {
       if (!pushSupported()) return;
-      const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+      const sub = await (await swReady()).pushManager.getSubscription();
       if (!sub) return;
       Store._setProfile(profile);
       await Store.savePushSubscription(sub.toJSON());
     } catch (e) { console.warn("push rebind", e); }
   }
   async function disablePush() {
-    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    const sub = await (await swReady()).pushManager.getSubscription();
     if (!sub) return;
     const endpoint = sub.endpoint;
     await sub.unsubscribe();
     try { await Store.deletePushSubscription(endpoint); } catch (e) { console.warn(e); }
   }
   const disablePushQuietly = async () => { try { if (pushSupported()) await disablePush(); } catch (e) { console.warn("push off", e); } };
+  /** Pairing: remove only the server row of the current family; keep the browser subscription. */
+  const dropServerPushQuietly = async () => {
+    try {
+      if (!pushSupported()) return;
+      const sub = await (await swReady()).pushManager.getSubscription();
+      if (sub) await Store.deletePushSubscription(sub.endpoint);
+    } catch (e) { console.warn("push drop", e); }
+  };
+  /**
+   * Boot: file this browser's existing subscription under the current family and person, once per
+   * page session (e.g. after pairing into another family). Bounded and non-fatal.
+   */
+  async function resyncPush(ctx) {
+    try {
+      if (Store.mode !== "supabase" || !pushSupported() || Notification.permission !== "granted") return;
+      const flag = "oila-push-synced", val = Store.Device.key() + "|" + ctx.profile.id;
+      try { if (sessionStorage.getItem(flag) === val) return; } catch (e) {}
+      const sub = await (await swReady()).pushManager.getSubscription();
+      if (!sub) return;
+      await withTimeout(Store.savePushSubscription(sub.toJSON()), 5000);
+      try { sessionStorage.setItem(flag, val); } catch (e) {}
+    } catch (e) { console.warn("push resync", e); }
+  }
 
   function openProfile() {
     const c = Store.ctx;
@@ -504,6 +539,7 @@
     icons();
     checkReminders();
     setInterval(checkReminders, 60000);
+    resyncPush(ctx);
   }
 
   /* ---------- installable app ---------- */

@@ -3,7 +3,7 @@ const assert = require("node:assert");
 const { chromium } = require("playwright");
 
 const BASE = process.env.BASE || "http://localhost:8765";
-const LUCIDE = "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42/scratchpad/vendor/package/dist/umd/lucide.min.js";
+const LUCIDE = process.env.LUCIDE_PATH || "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42/scratchpad/vendor/package/dist/umd/lucide.min.js";
 
 (async () => {
   const browser = await chromium.launch();
@@ -60,7 +60,21 @@ const LUCIDE = "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42
   await wife.click('[data-view="done"]');
   await tick("Gul sug'orish"); // un-tick: must notify nobody
   await wife.click('[data-view="today"]');
-  await tick("Gul sug'orish"); // re-tick: one more tasks_all_done
+  await tick("Gul sug'orish"); // re-tick: same day, so NO second tasks_all_done
+  const allDoneCount = async () => (await husb.evaluate(() => Store.list("notifications"))).filter((n) => n.type === "tasks_all_done").length;
+  assert.strictEqual(await allDoneCount(), 1, "re-tick sent another tasks_all_done");
+
+  // Without the once-a-day guard, finishing a partner's task or a future-dated own task must still not count.
+  await wife.evaluate(() => localStorage.removeItem("oila-alldone-u-xotin"));
+  await wife.click('[data-view="today"]');
+  await tick("Idishlarni yuvish"); // the husband's task
+  await wife.click('[data-view="upcoming"]');
+  await tick("Uyni tozalash"); // the wife's, due in 2 days
+  assert.strictEqual(await allDoneCount(), 1, "partner/future task sent tasks_all_done");
+  assert.strictEqual(await wife.evaluate(() => localStorage.getItem("oila-alldone-u-xotin")), null);
+
+  // A product added as "uyda bor": feed entry only, no notification.
+  await wife.evaluate(() => Store.logActivity("grocery_added", { item: "Guruch" }));
 
   const readFor = async (page, tbl) => page.evaluate((t) => Store.list(t), tbl);
   const notes = await readFor(husb, "notifications");
@@ -70,14 +84,20 @@ const LUCIDE = "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42
   assert.ok(need.length === 1 && need[0].body.includes("Xotiningiz «Kartoshka»ni kerak deb belgiladi — "), "grocery_need body: " + JSON.stringify(need));
   assert.strictEqual(need[0].module, "grocery");
   assert.ok(need[0].title && need[0].tag === "grocery_need" && need[0].text === need[0].body);
-  assert.strictEqual(by("task_done").length, 3, "task_done x3 (2 + re-tick), got " + by("task_done").length);
-  assert.strictEqual(by("tasks_all_done").length, 2, "tasks_all_done x2, got " + by("tasks_all_done").length);
+  assert.strictEqual(by("task_done").length, 5, "task_done x5 (2 + re-tick + partner + future), got " + by("task_done").length);
+  assert.strictEqual(by("tasks_all_done").length, 1, "tasks_all_done x1, got " + by("tasks_all_done").length);
+  assert.match(by("tasks_all_done")[0].body, /Kirlarni yuvish, Gul sug'orish|Gul sug'orish, Kirlarni yuvish/);
   assert.strictEqual(by("task_done")[0].module, "tasks");
 
   const wifeNotes = await readFor(wife, "notifications");
   assert.strictEqual(wifeNotes.filter((n) => n.actor_id === "u-xotin").length, 0, "wife got own notifications");
   const act = await wife.evaluate(() => Store.list("activity"));
-  assert.ok(act.some((a) => a.module === "grocery" && a.text === "Xotiningiz «Kartoshka»ni kerak deb belgiladi"), "activity fixed text");
+  // Shared feed: third person with the first name, never "Xotiningiz"/"Sizga".
+  assert.ok(act.some((a) => a.module === "grocery" && a.text === "Malika «Kartoshka»ni kerak deb belgiladi"), "activity text: " + JSON.stringify(act.map((a) => a.text)));
+  assert.ok(act.some((a) => a.text === "Malika yangi mahsulot qo'shdi: «Guruch»"), "grocery_added activity");
+  assert.ok(act.some((a) => a.text === "Malika bugungi barcha ishlarni tugatdi 💐"), "all-done activity");
+  assert.ok(act.every((a) => !/Xotiningiz|Eringiz|Sizga/.test(a.text)), "second person in feed: " + act.map((a) => a.text));
+  assert.strictEqual(notes.filter((n) => n.type && n.module === "grocery").length, 1, "grocery_added must not notify");
 
   assert.deepStrictEqual(errors, [], errors.join("\n"));
   await browser.close();

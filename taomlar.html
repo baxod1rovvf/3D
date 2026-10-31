@@ -195,7 +195,7 @@ function openEditor(meal, preset = {}) {
         try {
           if (isNew) {
             await Store.insert("meals", { ...v, created_by: Store.ctx.profile.id });
-            Store.notify("meal_added", { meal: v.title, slot: v.slot }, "taomlar.html");
+            Store.notify("meal_added", { meal: v.title, slot: v.slot, day: App.WEEKDAYS[App.parseYmd(v.day_date).getDay()], slotName: slotName(v.slot) }, "taomlar.html");
             App.toast(`«${v.title}» rejaga qo'shildi`);
           } else {
             await Store.update("meals", m.id, v);

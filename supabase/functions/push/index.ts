@@ -10,7 +10,8 @@ import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.117.0";
 
 // ---- js/messages.js ----
-// Playful notification copy: build(type, data, rand) -> { title, body, fixed, tag, vibrate }. Plain script, no DOM.
+// Playful notification copy: build(type, data, rand) -> { title, body, fixed, tag, vibrate } (read by the recipient),
+// and activity(type, data) -> third-person line for the shared feed (or null). Plain script, no DOM.
 (function (root) {
   const TITLES = {
     grocery_need: "🛒 Ro'zg'or",
@@ -36,11 +37,11 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.0";
   const ENDINGS = {
     grocery_need: {
       xotin: ["do'kondan qaytishda olib keling 🥛", "yo'lda do'konga kirib o'tsangiz bo'ladi 🛒", "bugun olib kelsangiz, juda xursand bo'ladi 😊", "ro'yxatga qarab olib keling, rahmat oldindan 🙏", "unutmasdan olib keling, iltimos 💛", "olib kelsangiz, kechki ovqat zo'r chiqadi 🍲"],
-      er: ["ro'yxatga qarab, o'zingiz xohlagan narsani qo'shib qo'ying 📝", "kerak bo'lsa, men olib kelaman deb ayting 💪", "do'konga birga chiqsak ham bo'ladi 🛒", "bugun do'kon vaqtida ochiq, ulgurib qoling 🕐", "yana nima kerakligini ham yozib qo'ying ✍️", "olib kelishga yordam beraman 🤝"],
+      er: ["u bilan birga ro'yxatni ko'rib chiqing 📝", "unga yana nima kerakligini ayting 💬", "kerak bo'lsa, siz ham qo'shib qo'ying ✍️", "do'konga u bilan birga borsangiz ham bo'ladi 🛒", "e'tibori uchun unga rahmat ayting 🌷", "ro'yxatni to'ldirishga yordam bering 🤝"],
     },
     grocery_bought: {
-      xotin: ["rahmat aytishni unutmang 😊", "unga yaxshi so'z ayting 💛", "mehribonligi uchun minnatdorchilik bildiring 🌷", "bir chaqmoq choy bilan xursand qiling ☕", "arzimagan narsa, lekin e'tibor juda yoqadi 🥰", "unga bugun dam berib qo'ying 🛋️"],
-      er: ["rahmat aytishni unutmang 😊", "unga yaxshi so'z ayting 💛", "kuchli yelkangiz uchun rahmat ayting 💪", "uni choy bilan siylang ☕", "mehnatini qadrlang, u buni sezadi 🥰", "bugun u bilan birga tushlik qiling 🍽️"],
+      xotin: ["rahmat aytishni unutmang 😊", "unga yaxshi so'z ayting 💛", "mehribonligi uchun minnatdorchilik bildiring 🌷", "bir piyola choy bilan xursand qiling ☕", "arzimagan narsa, lekin e'tibor juda yoqadi 🥰", "unga bugun dam berib qo'ying 🛋️"],
+      er: ["rahmat aytishni unutmang 😊", "unga yaxshi so'z ayting 💛", "kuchli yelkasi uchun rahmat ayting 💪", "uni choy bilan siylang ☕", "mehnatini qadrlang, u buni sezadi 🥰", "bugun u bilan birga tushlik qiling 🍽️"],
     },
     task_done: {
       xotin: ["zo'r! 👏", "rahmat deb qo'ying 🌷", "baraka topsin, uy yanada toza 🏡", "bir og'iz maqtov ayting, kuni yaxshi bo'ladi 💛", "uy juda yoqimli bo'ldi ✨", "unga bir stakan choy damlab bering ☕"],
@@ -55,18 +56,31 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.0";
       er: ["vaqti topilsa, bajarib qo'ying 🙏", "bajarsangiz juda xursand bo'ladi 😊", "tugatgach, belgilab qo'yishni unutmang ✅", "kerak bo'lsa, unga savol bering 💬", "birga qilsangiz, tezroq bitadi 🤝", "uddalaysiz, ishonamiz 💪"],
     },
     meal_added: {
-      xotin: ["ishtaha bilan yeng 😋", "mazali bo'lishiga ishonamiz 🍲", "kerakli masalliqlarni olib kelib bering 🛒", "unga rahmat ayting 🌷", "kechki dasturxon yaxshi bo'ladi 🍽️", "hidi hozirdan keldi, shekilli 😄"],
-      er: ["ishtaha bilan yeng 😋", "mazali bo'lishiga ishonamiz 🍲", "kerakli masalliqlarni birga olib kelsangiz bo'ladi 🛒", "unga rahmat ayting 🌷", "bugun dasturxon boy bo'ladi 🍽️", "hidi hozirdan keldi, shekilli 😄"],
+      xotin: ["ishtaha bilan yeng 😋", "mazali bo'lishiga ishonamiz 🍲", "kerakli masalliqlarni olib kelib bering 🛒", "unga rahmat ayting 🌷", "dasturxon yanada to'kin bo'ladi 🍽️", "hidi hozirdan keldi, shekilli 😄"],
+      er: ["ishtaha bilan yeng 😋", "mazali bo'lishiga ishonamiz 🍲", "masalliqlarni u bilan birga olib kelsangiz bo'ladi 🛒", "unga rahmat ayting 🌷", "dasturxon boy bo'ladi 🍽️", "hidi hozirdan keldi, shekilli 😄"],
     },
     memory_added: {
-      xotin: ["birga ko'rib, tabassum qiling 😊", "yoqimli lahzalar eslansin 💛", "siz ham bir fotosurat qo'shing 📸", "bunday kunlar ko'proq bo'lsin 🌸", "ko'rib chiqib, yurak so'zlaringizni yozing 💌", "oilaviy xotiralar eng qimmat boylik 🏡"],
-      er: ["birga ko'rib, tabassum qiling 😊", "yoqimli lahzalar eslansin 💛", "siz ham bir fotosurat qo'shing 📸", "bunday kunlar ko'proq bo'lsin 🌸", "ko'rib chiqib, yurak so'zlaringizni yozing 💌", "oilaviy xotiralar eng qimmat boylik 🏡"],
+      xotin: ["birga ko'rib, tabassum qiling 😊", "yoqimli lahzalar eslansin 💛", "siz ham bir fotosurat qo'shing 📸", "bunday kunlar ko'proq bo'lsin 🌸", "ko'rib chiqib, unga iliq so'z ayting 💌", "oilaviy xotiralar eng qimmat boylik 🏡"],
+      er: ["birga ko'rib, tabassum qiling 😊", "yoqimli lahzalar eslansin 💛", "siz ham bir fotosurat qo'shing 📸", "bunday kunlar ko'proq bo'lsin 🌸", "ko'rib chiqib, unga iliq so'z ayting 💌", "oilaviy xotiralar eng qimmat boylik 🏡"],
     },
   };
 
   const ROLE = { xotin: "Xotiningiz", er: "Eringiz" };
-  const SLOT = { nonushta: "Nonushta", tushlik: "Tushlik", kechki: "Kechki ovqat" };
+  // Meal slots: name (also lowercased in lists) and dative ("…ga") form.
+  const SLOT = {
+    nonushta: { name: "Nonushta", dat: "Nonushtaga" },
+    tushlik: { name: "Tushlik", dat: "Tushlikka" },
+    kechki: { name: "Kechki ovqat", dat: "Kechki ovqatga" },
+  };
 
+  // " (Juma, kechki ovqat)" when the day and/or slot are known.
+  function mealWhen(d) {
+    const slot = d.slotName || (SLOT[d.slot] && SLOT[d.slot].name);
+    const parts = [d.day, slot && slot.toLowerCase()].filter(Boolean);
+    return parts.length ? " (" + parts.join(", ") + ")" : "";
+  }
+
+  // Text the RECIPIENT reads (push and bell): the actor is named by role, "you" is the reader.
   function fixedFor(type, d) {
     const who = ROLE[d.actorRole] || "Yaqiningiz";
     const item = d.item || "narsa", task = d.task || "ish", meal = d.meal || "taom", memory = d.memory || "lahza";
@@ -74,15 +88,36 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.0";
       case "grocery_need": return who + " «" + item + "»ni kerak deb belgiladi";
       case "grocery_bought": return who + " «" + item + "»ni oldi ✅";
       case "task_done": return who + " «" + task + "»ni tugatdi";
-      case "tasks_all_done": return who + " bugungi barcha ishlarni tugatdi: " + (d.tasks && d.tasks.length ? d.tasks.join(", ") : "ishlar");
-      case "task_assigned": return "Sizga yangi ish: «" + task + "»";
-      case "meal_added": return who + " menyuga «" + meal + "» qo'shdi";
+      case "tasks_all_done": return who + " bugungi barcha ishlarni tugatdi" + (d.tasks && d.tasks.length ? ": " + d.tasks.join(", ") : "");
+      case "task_assigned": return who + " sizga yangi ish berdi: «" + task + "»";
+      case "meal_added": return who + " menyuga «" + meal + "» qo'shdi" + mealWhen(d);
       case "memory_added": return "Yangi xotira: «" + memory + "»";
       case "meal_reminder":
-        return (SLOT[d.slot] || "Taom") + "ga " + (d.hours == null ? "bir necha" : d.hours) + " soat qoldi" +
+        return (SLOT[d.slot] ? SLOT[d.slot].dat : "Taomga") + " " + (d.hours == null ? "bir necha" : d.hours) + " soat qoldi" +
           (d.meal ? " — menyuda «" + meal + "»" : " — hali reja yo'q, nima pishiramiz? 🤔");
       case "test": return "Bildirishnomalar ishlayapti! 🎉";
       default: throw new Error("Unknown message type: " + type);
+    }
+  }
+
+  // Shared home feed, seen by BOTH people: third person, the actor by first name (d.actor).
+  // Returns null for types that have no feed entry (test, meal_reminder).
+  function activity(type, data) {
+    const d = data || {};
+    const who = d.actor || "Kimdir";
+    const item = d.item || "narsa", task = d.task || "ish", meal = d.meal || "taom", memory = d.memory || "lahza";
+    switch (type) {
+      case "grocery_need": return who + " «" + item + "»ni kerak deb belgiladi";
+      case "grocery_bought": return who + " «" + item + "»ni oldi ✅";
+      case "grocery_added": return who + " yangi mahsulot qo'shdi: «" + item + "»";
+      case "task_done": return who + " «" + task + "»ni tugatdi";
+      case "tasks_all_done": return who + " bugungi barcha ishlarni tugatdi 💐";
+      case "task_assigned": return who + " yangi ish qo'shdi: «" + task + "»" + (d.assignee ? " — " + d.assignee + " uchun" : "");
+      case "task_added": return who + " yangi ish qo'shdi: «" + task + "»";
+      case "meal_added": return who + " menyuga «" + meal + "» qo'shdi" + mealWhen(d);
+      case "memory_added": return who + " yangi xotira qo'shdi: «" + memory + "»";
+      case "meal_reminder": case "test": return null;
+      default: throw new Error("Unknown activity type: " + type);
     }
   }
 
@@ -105,7 +140,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.0";
     };
   }
 
-  root.Messages = { build };
+  root.Messages = { build, activity };
 })(globalThis);
 
 // ---- js/reminders.js ----
@@ -183,12 +218,20 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.0";
     try { return root.Messages.build(type || "test", {}).vibrate; } catch (e) { return root.Messages.build("test", {}).vibrate; }
   }
 
+  // One tag per notification, so a new push never silently replaces an earlier one.
+  // Only meal reminders share a slot tag (a newer reminder for the same meal replaces the old one).
+  function tagFor(n) {
+    if (n.type === "meal_reminder") return n.tag || "meal_reminder";
+    const base = n.type || n.module || "oila";
+    return n.id ? base + "-" + n.id : base;
+  }
+
   // notifications row -> sw.js payload {title, body, tag, vibrate, url}
   function payloadFor(n) {
     return {
       title: n.title || "Oila Uchun",
       body: n.body || n.text || "",
-      tag: n.tag || n.type || n.module || "oila",
+      tag: tagFor(n),
       vibrate: vibrateFor(n.type),
       url: n.link || "index.html",
     };
@@ -201,8 +244,10 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.0";
 
   // Due meal reminders -> [{household_id, profile_id, day, slot, notification}]
   // (the first four are the meal_reminders_sent claim; notification is the row to insert).
-  function reminderJobs({ households, profiles, settings, meals, now, rand }) {
+  // Only people with a lead time > 0 AND at least one phone subscribed (push_subscriptions row).
+  function reminderJobs({ households, profiles, settings, meals, subscriptions, now, rand }) {
     const allowed = households ? new Set(households.map((h) => (typeof h === "string" ? h : h.key))) : null;
+    const subscribed = new Set((subscriptions || []).filter(Boolean).map((s) => s.household_id + "|" + s.profile_id));
     const byHouse = {};
     (settings || []).forEach((s) => { byHouse[s.household_id] = s; });
     const out = [];
@@ -210,6 +255,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.0";
       if (allowed && !allowed.has(p.household_id)) continue;
       const lead = Number(p.meal_lead_hours);
       if (!(lead > 0)) continue;
+      if (!subscribed.has(p.household_id + "|" + p.id)) continue;
       const s = { ...DEFAULTS };
       const row = byHouse[p.household_id] || {};
       ["breakfast", "lunch", "dinner"].forEach((k) => { if (row[k]) s[k] = row[k]; });
@@ -303,15 +349,18 @@ async function sendNotificationRow(id) {
 }
 
 // Meal reminders: claim each due one, then insert a notification (its trigger sends the push).
+// Only for people with a lead time and at least one subscribed phone.
 async function tick() {
   const now = new Date();
   const day = (offset) => new Date(now.getTime() + offset * 86400000).toISOString().slice(0, 10);
   const profiles = must(await db.from("profiles").select("id, household_id, meal_lead_hours").gt("meal_lead_hours", 0));
   if (!profiles.length) return 0;
+  const subscriptions = must(await db.from("push_subscriptions").select("household_id, profile_id"));
+  if (!subscriptions.length) return 0;
   const settings = must(await db.from("family_settings").select("*"));
   const meals = must(await db.from("meals").select("household_id, day_date, slot, title")
     .gte("day_date", day(-1)).lte("day_date", day(2)));
-  const jobs = PushLogic.reminderJobs({ profiles, settings, meals, now });
+  const jobs = PushLogic.reminderJobs({ profiles, settings, meals, subscriptions, now });
   let queued = 0;
   for (const j of jobs) {
     const claim = await db.from("meal_reminders_sent")

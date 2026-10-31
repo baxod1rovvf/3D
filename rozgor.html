@@ -288,6 +288,7 @@ function openEditor(item) {
             const row = await Store.insert("grocery_items", { ...v, status: needed ? "kerak" : "bor", added_by: me, marked_by: needed ? me : null, marked_at: needed ? new Date().toISOString() : null });
             fresh = row && row.id ? { id: row.id, t0: null } : null;
             if (needed) Store.notify("grocery_need", { item: v.name }, "rozgor.html?view=need");
+            else Store.logActivity("grocery_added", { item: v.name });
             App.toast(`${Stickers.forName(v.name, v.category)} «${v.name}» qo'shildi`);
           } else {
             await Store.update("grocery_items", it.id, v);

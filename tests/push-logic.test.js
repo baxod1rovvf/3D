@@ -23,16 +23,26 @@ test("pickRecipients returns [] when the recipient has none", () => {
 });
 
 test("payloadFor maps a notification row to the sw.js payload", () => {
-  const p = PushLogic.payloadFor({ type: "grocery_need", title: "T", body: "B", tag: "grocery_need", text: "x", link: "rozgor.html" });
+  const p = PushLogic.payloadFor({ id: "n1", type: "grocery_need", title: "T", body: "B", tag: "grocery_need", text: "x", link: "rozgor.html" });
   assert.strictEqual(p.title, "T");
   assert.strictEqual(p.body, "B");
-  assert.strictEqual(p.tag, "grocery_need");
+  assert.strictEqual(p.tag, "grocery_need-n1");
   assert.strictEqual(p.url, "rozgor.html");
   assert.ok(Array.isArray(p.vibrate) && p.vibrate.length > 0);
   const old = PushLogic.payloadFor({ module: "tasks", text: "eski", link: null });
   assert.strictEqual(old.body, "eski");
   assert.strictEqual(old.url, "index.html");
   assert.ok(old.title);
+});
+
+test("payloadFor tags are unique per notification, except meal reminders per slot", () => {
+  const a = PushLogic.payloadFor({ id: "n1", type: "task_done", tag: "task_done" });
+  const b = PushLogic.payloadFor({ id: "n2", type: "task_done", tag: "task_done" });
+  assert.notStrictEqual(a.tag, b.tag);
+  assert.strictEqual(a.tag, "task_done-n1");
+  assert.strictEqual(PushLogic.payloadFor({ id: "n3", type: "meal_reminder", tag: "meal_reminder-kechki" }).tag, "meal_reminder-kechki");
+  assert.strictEqual(PushLogic.payloadFor({ id: "n4", type: "meal_reminder" }).tag, "meal_reminder");
+  assert.strictEqual(PushLogic.payloadFor({ id: "n5", module: "tasks" }).tag, "tasks-n5");
 });
 
 test("isFresh only accepts recent notifications", () => {
@@ -51,6 +61,7 @@ const base = () => ({
   ],
   settings: [{ household_id: HH, breakfast: "08:00", lunch: "13:00", dinner: "19:00", timezone: "Asia/Tashkent" }],
   meals: [{ household_id: HH, day_date: "2026-10-30", slot: "kechki", title: "Palov" }],
+  subscriptions: [sub("w", WIFE), sub("h", HUSB)],
   now: NOW,
 });
 
@@ -92,4 +103,13 @@ test("reminderJobs uses defaults when a family has no settings or a bad timezone
 
 test("reminderJobs skips profiles of households not listed", () => {
   assert.deepStrictEqual(PushLogic.reminderJobs({ ...base(), households: [] }), []);
+});
+
+test("reminderJobs only for people with at least one subscribed phone", () => {
+  assert.deepStrictEqual(PushLogic.reminderJobs({ ...base(), subscriptions: [] }), []);
+  assert.deepStrictEqual(PushLogic.reminderJobs({ ...base(), subscriptions: undefined }), []);
+  assert.deepStrictEqual(PushLogic.reminderJobs({ ...base(), subscriptions: [sub("h", HUSB)] }), []);
+  // a subscription row of the same person id in another family does not count
+  assert.deepStrictEqual(PushLogic.reminderJobs({ ...base(), subscriptions: [sub("x", WIFE, "o".repeat(32))] }), []);
+  assert.strictEqual(PushLogic.reminderJobs({ ...base(), subscriptions: [sub("w", WIFE)] }).length, 1);
 });

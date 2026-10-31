@@ -107,6 +107,7 @@ test("POST notification_id pushes to the recipient's phones and drops gone ones"
   assert.deepStrictEqual(f.sent.map((s) => s.endpoint), ["e-husb"]);
   assert.deepStrictEqual(Object.keys(f.sent[0].payload).sort(), ["body", "tag", "title", "url", "vibrate"]);
   assert.strictEqual(f.sent[0].payload.url, "rozgor.html");
+  assert.strictEqual(f.sent[0].payload.tag, "grocery_need-aaaaaaaa-0000-4000-8000-000000000001");
   assert.strictEqual(f.sent[0].opts.TTL, 3600);
   assert.strictEqual(f.sent[0].opts.vapidDetails.publicKey, "PUB");
   assert.deepStrictEqual(tables.push_subscriptions.map((s) => s.endpoint), ["e-husb", "e-wife"]);
@@ -131,6 +132,7 @@ test("POST tick claims each reminder once and inserts a notification row", async
     profiles: [{ id: WIFE, household_id: HH, meal_lead_hours: 2 }, { id: HUSB, household_id: HH, meal_lead_hours: 0 }],
     family_settings: [{ household_id: HH, breakfast: "99:99", lunch: "99:99", dinner: hhmm, timezone: "UTC" }],
     meals: [{ household_id: HH, day_date: mealDay, slot: "kechki", title: "Palov" }],
+    push_subscriptions: [{ endpoint: "e-wife", household_id: HH, profile_id: WIFE, subscription: { endpoint: "e-wife" } }],
     notifications: [],
   };
   const f = load(tables);
@@ -144,4 +146,20 @@ test("POST tick claims each reminder once and inserts a notification row", async
   assert.strictEqual(n.type, "meal_reminder");
   assert.match(n.body, /Palov/);
   assert.ok(today);
+});
+
+test("POST tick skips people without a subscribed phone (no claim, no row)", async () => {
+  const d = new Date(Date.now() + 2 * 3600000);
+  const hhmm = String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
+  const tables = {
+    profiles: [{ id: WIFE, household_id: HH, meal_lead_hours: 2 }],
+    family_settings: [{ household_id: HH, breakfast: "99:99", lunch: "99:99", dinner: hhmm, timezone: "UTC" }],
+    meals: [],
+    push_subscriptions: [{ endpoint: "e-husb", household_id: HH, profile_id: HUSB, subscription: { endpoint: "e-husb" } }],
+    notifications: [],
+  };
+  const f = load(tables);
+  assert.deepStrictEqual(await (await f.call("POST", "", { tick: true })).json(), { sent: 0 });
+  assert.strictEqual((tables.meal_reminders_sent || []).length, 0);
+  assert.strictEqual(tables.notifications.length, 0);
 });

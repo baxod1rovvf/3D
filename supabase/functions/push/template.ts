@@ -76,15 +76,18 @@ async function sendNotificationRow(id) {
 }
 
 // Meal reminders: claim each due one, then insert a notification (its trigger sends the push).
+// Only for people with a lead time and at least one subscribed phone.
 async function tick() {
   const now = new Date();
   const day = (offset) => new Date(now.getTime() + offset * 86400000).toISOString().slice(0, 10);
   const profiles = must(await db.from("profiles").select("id, household_id, meal_lead_hours").gt("meal_lead_hours", 0));
   if (!profiles.length) return 0;
+  const subscriptions = must(await db.from("push_subscriptions").select("household_id, profile_id"));
+  if (!subscriptions.length) return 0;
   const settings = must(await db.from("family_settings").select("*"));
   const meals = must(await db.from("meals").select("household_id, day_date, slot, title")
     .gte("day_date", day(-1)).lte("day_date", day(2)));
-  const jobs = PushLogic.reminderJobs({ profiles, settings, meals, now });
+  const jobs = PushLogic.reminderJobs({ profiles, settings, meals, subscriptions, now });
   let queued = 0;
   for (const j of jobs) {
     const claim = await db.from("meal_reminders_sent")

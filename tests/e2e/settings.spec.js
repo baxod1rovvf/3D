@@ -137,6 +137,63 @@ const SHOT = "/tmp/claude-0/-home-user-3D/600534e3-7512-520f-b92f-9f4302834d42/s
   await p4.click(".sheet .btn.danger, .sheet [data-ok], .sheet .btn.primary");
   await p4.waitForURL("**/kirish.html", { timeout: 6000 });
 
+  const asWife = () => { if (!sessionStorage.getItem("oila-me")) { sessionStorage.setItem("oila-family-key", "demo-family"); sessionStorage.setItem("oila-me", "u-xotin"); } };
+
+  // iPhone Safari (not installed, no PushManager): tells to install first.
+  const p5 = track(await ctx.newPage());
+  await p5.addInitScript(asWife);
+  await p5.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", { get: () => "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" });
+    delete window.PushManager;
+  });
+  await p5.goto(BASE + "/index.html");
+  await p5.waitForFunction(() => window.Store && Store.ctx);
+  await p5.click("#settings-btn");
+  await p5.waitForFunction(() => /bosh ekranga o'rnating/.test(document.querySelector("[data-push-row]").textContent));
+  assert.ok((await p5.textContent("[data-install-row]")).includes("Menda kod bor"), "iOS hint mentions pairing inside the app");
+
+  // serviceWorker.ready never resolves: the status must not stay on "checking".
+  const p6 = track(await ctx.newPage());
+  await p6.addInitScript(asWife);
+  await p6.addInitScript(() => {
+    Object.defineProperty(navigator.serviceWorker, "ready", { get: () => new Promise(() => {}) });
+    Object.defineProperty(Notification, "permission", { get: () => "default" }); // headless reports "denied"
+  });
+  await p6.goto(BASE + "/index.html");
+  await p6.waitForFunction(() => window.Store && Store.ctx);
+  await p6.evaluate(() => { Store.pushPublicKey = async () => "BAAA"; });
+  await p6.click("#settings-btn");
+  await p6.waitForFunction(() => /qo'llamaydi/.test(document.querySelector("[data-push-status]").textContent), null, { timeout: 7000 });
+
+  // The test button shows an error when the notification can't be saved.
+  await p6.evaluate(() => { Store.insert = async () => { throw new Error("offline"); }; });
+  await p6.click("[data-push-test]");
+  await p6.waitForFunction(() => [...document.querySelectorAll(".toast")].some((t) => /Saqlab bo'lmadi/.test(t.textContent)));
+  assert.ok(!(await p6.evaluate(() => [...document.querySelectorAll(".toast")].some((t) => /Sinov xabari yuborildi/.test(t.textContent)))), "false success toast");
+
+  // Pairing into a family: only the old server row is dropped; the browser stays subscribed.
+  const p7 = track(await ctx.newPage());
+  await p7.addInitScript(asWife);
+  await p7.addInitScript(() => {
+    const sub = { endpoint: "https://push.example/pair", toJSON() { return { endpoint: this.endpoint, keys: {} }; }, unsubscribe() { sessionStorage.setItem("__unsub", "1"); return Promise.resolve(true); } };
+    const reg = { pushManager: { getSubscription: () => Promise.resolve(sub), subscribe: () => Promise.resolve(sub) } };
+    Object.defineProperty(navigator.serviceWorker, "ready", { get: () => Promise.resolve(reg) });
+  });
+  await p7.goto(BASE + "/index.html");
+  await p7.waitForFunction(() => window.Store && Store.ctx);
+  const code = await p7.evaluate(async () => {
+    Store.deletePushSubscription = async (e) => sessionStorage.setItem("__del", e);
+    return Store.createPairCode();
+  });
+  await p7.click("#settings-btn");
+  await p7.click("[data-pair-enter]");
+  await p7.waitForSelector("#pair-in");
+  await p7.fill("#pair-in", code);
+  await p7.click("[data-pair] button[type=submit]");
+  await p7.waitForURL("**/kirish.html", { timeout: 8000 });
+  assert.strictEqual(await p7.evaluate(() => sessionStorage.getItem("__del")), "https://push.example/pair");
+  assert.strictEqual(await p7.evaluate(() => sessionStorage.getItem("__unsub")), null, "pairing unsubscribed the browser");
+
   await browser.close();
   assert.deepStrictEqual(errors, []);
   console.log("settings.spec OK");

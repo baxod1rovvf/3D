@@ -157,6 +157,20 @@ function burst(btn) {
   }
 }
 
+// "All of today's tasks are done": only after finishing one of MY tasks that is due today (or undated),
+// when none of mine due by today is left, and at most once per person per day.
+function maybeAllDone(x) {
+  const t = App.today(), me = Store.ctx.profile.id;
+  if (x.assignee_id !== me || (x.due_date && x.due_date > t)) return;
+  const mine = tasks.filter((y) => y.assignee_id === me);
+  if (mine.some((y) => !y.done && (!y.due_date || y.due_date <= t))) return;
+  const titles = mine.filter((y) => y.done && y.completed_at && App.ymd(new Date(y.completed_at)) === t).map((y) => y.title);
+  if (!titles.length) return;
+  const flag = "oila-alldone-" + me;
+  try { if (localStorage.getItem(flag) === t) return; localStorage.setItem(flag, t); } catch (e) {}
+  Store.notify("tasks_all_done", { tasks: titles }, "uy-ishlari.html");
+}
+
 $("#list").addEventListener("click", async (e) => {
   const cardEl = e.target.closest(".task"); if (!cardEl) return;
   const x = tasks.find((t) => t.id === cardEl.dataset.id); if (!x) return;
@@ -171,12 +185,7 @@ $("#list").addEventListener("click", async (e) => {
       Object.assign(x, patch);
       if (done) {
         Store.notify("task_done", { task: x.title }, "uy-ishlari.html");
-        const t = App.today(), me = Store.ctx.profile.id;
-        const mine = tasks.filter((y) => y.assignee_id === me);
-        if (!mine.some((y) => !y.done && (!y.due_date || y.due_date <= t))) {
-          const titles = mine.filter((y) => y.done && y.completed_at && App.ymd(new Date(y.completed_at)) === t).map((y) => y.title);
-          Store.notify("tasks_all_done", { tasks: titles }, "uy-ishlari.html");
-        }
+        maybeAllDone(x);
       }
     } catch (err) { App.fail(err); }
     setTimeout(draw, done ? 950 : 0);
@@ -218,11 +227,12 @@ function openEditor(task) {
         try {
           if (isNew) {
             await Store.insert("tasks", { ...v, reminded: false, done: false, created_by: c.profile.id });
-            if (!App.isMe(v.assignee_id)) Store.notify("task_assigned", { task: v.title }, "uy-ishlari.html");
+            if (!App.isMe(v.assignee_id)) Store.notify("task_assigned", { task: v.title, assignee: App.firstName(App.person(v.assignee_id)) }, "uy-ishlari.html");
+            else Store.logActivity("task_added", { task: v.title });
             App.toast("Ish qo'shildi");
           } else {
             await Store.update("tasks", x.id, v);
-            if (v.assignee_id !== x.assignee_id && !App.isMe(v.assignee_id)) Store.notify("task_assigned", { task: v.title }, "uy-ishlari.html");
+            if (v.assignee_id !== x.assignee_id && !App.isMe(v.assignee_id)) Store.notify("task_assigned", { task: v.title, assignee: App.firstName(App.person(v.assignee_id)) }, "uy-ishlari.html");
             App.toast("Saqlandi");
           }
           api.close(); render();

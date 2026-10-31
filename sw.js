@@ -47,6 +47,7 @@ self.addEventListener("push", (e) => {
   e.waitUntil(self.registration.showNotification(d.title || "Oila Uchun", {
     body: d.body || "",
     tag: d.tag,
+    renotify: !!d.tag, // a repeated tag still buzzes
     vibrate: d.vibrate,
     icon: "assets/icon-192.png",
     badge: "assets/icon-192.png",

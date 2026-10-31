@@ -153,6 +153,7 @@
     const clients = {};
     const key = () => Device.key();
     const check = ({ data, error }) => { if (error) throw error; return data; };
+    const missingNotifColumn = (e) => e.code === "PGRST204" || /column.*\b(type|title|body|tag)\b|\b(type|title|body|tag)\b.*column/i.test(e.message || "");
 
     // The family key travels as a header; Row Level Security compares it with household_id.
     async function client(k = key()) {
@@ -217,7 +218,13 @@
       },
       async insert(table, row) {
         const c = await client();
-        const r = check(await c.from(table).insert({ ...row, household_id: key() }).select().single());
+        let res = await c.from(table).insert({ ...row, household_id: key() }).select().single();
+        // The site may be published before schema.sql adds the notification columns: retry with the old ones.
+        if (res.error && table === "notifications" && missingNotifColumn(res.error)) {
+          const { recipient_id, actor_id, module, text, link, read } = row;
+          res = await c.from(table).insert({ recipient_id, actor_id, module, text, link, read, household_id: key() }).select().single();
+        }
+        const r = check(res);
         announce(table, { eventType: "INSERT", new: r });
         return r;
       },
@@ -473,6 +480,8 @@
     };
   }
 
+  const moduleOf = (type) => (type === "test" ? "test" : type.startsWith("grocery") ? "grocery" : type.startsWith("task") ? "tasks" : type.startsWith("meal") ? "meals" : "memories");
+
   const backend = cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY ? supabaseBackend() : cfg.API_URL ? apiBackend() : demoBackend();
 
   /* ------------------------------------------------------------------ */
@@ -508,16 +517,35 @@
     /** Disconnect this phone (the family's data stays). */
     forgetDevice() { Device.del("oila-family-key"); Device.del("oila-me"); },
 
-    /** Record an activity and send a typed, playful notification to the partner (or self with opts.toSelf). */
+    /**
+     * Record a third-person entry in the shared activity feed, and send a typed, playful notification
+     * to the partner (or to self with opts.toSelf). Errors are logged, except with opts.toSelf
+     * (the Settings test button), where they are rethrown so the caller can show them.
+     */
     async notify(type, data, link, opts) {
       const c = Store.ctx;
       if (!c) return;
+      const toSelf = !!(opts && opts.toSelf);
       const m = globalThis.Messages.build(type, { actorRole: c.profile.role, ...(data || {}) });
-      const module = type === "test" ? "test" : type.startsWith("grocery") ? "grocery" : type.startsWith("task") ? "tasks" : type.startsWith("meal") ? "meals" : "memories";
-      const jobs = [Store.insert("activity", { actor_id: c.profile.id, module, text: m.fixed })];
-      const to = opts && opts.toSelf ? c.profile : c.partner;
+      const module = moduleOf(type);
+      const jobs = [];
+      const feed = Store.activityText(type, data);
+      if (feed) jobs.push(Store.insert("activity", { actor_id: c.profile.id, module, text: feed }));
+      const to = toSelf ? c.profile : c.partner;
       if (to) jobs.push(Store.insert("notifications", { recipient_id: to.id, actor_id: c.profile.id, module, type, title: m.title, body: m.body, tag: m.tag, text: m.body, link: link || null, read: false }));
-      try { await Promise.all(jobs); } catch (e) { console.warn("notify failed", e); }
+      try { await Promise.all(jobs); } catch (e) { console.warn("notify failed", e); if (toSelf) throw e; }
+    },
+    /** Only a feed entry, no notification (e.g. a product added as "uyda bor", a task for yourself). */
+    async logActivity(type, data) {
+      const c = Store.ctx;
+      const feed = c && Store.activityText(type, data);
+      if (!feed) return;
+      try { await Store.insert("activity", { actor_id: c.profile.id, module: moduleOf(type), text: feed }); } catch (e) { console.warn("activity failed", e); }
+    },
+    activityText(type, data) {
+      const c = Store.ctx;
+      const first = (p) => (p && p.full_name ? p.full_name.trim().split(/\s+/)[0] : null);
+      return globalThis.Messages.activity(type, { actor: first(c && c.profile), ...(data || {}) });
     },
 
     /** Resize an image file to a JPEG blob (keeps uploads small and fast). */
