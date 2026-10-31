@@ -218,7 +218,8 @@ $("#list").addEventListener("click", async (e) => {
       await Store.update("grocery_items", item.id, toNeed
         ? { status: "kerak", marked_by: me, marked_at: item.marked_at, purchased_by: null, purchased_at: null }
         : { status: "bor", marked_by: null, marked_at: null });
-      if (toNeed) Store.notify("grocery_need", { item: item.name }, "rozgor.html?view=need");
+      if (toNeed) App.queueGrocery("grocery_need", item.name);
+      else App.unqueueGrocery("grocery_need", item.name);
     } catch (err) { App.fail(err); }
     draw();
   } else if (e.target.closest("[data-buy]")) {
@@ -227,7 +228,7 @@ $("#list").addEventListener("click", async (e) => {
     if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
     try {
       await Store.update("grocery_items", item.id, { status: "olindi", purchased_by: me, purchased_at: new Date().toISOString() });
-      Store.notify("grocery_bought", { item: item.name }, "rozgor.html?view=bought");
+      App.queueGrocery("grocery_bought", item.name);
     } catch (err) { App.fail(err); row.classList.remove("leaving"); btn.classList.remove("on"); }
   } else if (e.target.closest("[data-restock]")) {
     try { await Store.update("grocery_items", item.id, { status: "bor", marked_by: null, marked_at: null }); } catch (err) { App.fail(err); }
@@ -287,7 +288,7 @@ function openEditor(item) {
             const needed = f.elements.needed.checked;
             const row = await Store.insert("grocery_items", { ...v, status: needed ? "kerak" : "bor", added_by: me, marked_by: needed ? me : null, marked_at: needed ? new Date().toISOString() : null });
             fresh = row && row.id ? { id: row.id, t0: null } : null;
-            if (needed) Store.notify("grocery_need", { item: v.name }, "rozgor.html?view=need");
+            if (needed) App.queueGrocery("grocery_need", v.name);
             else Store.logActivity("grocery_added", { item: v.name });
             App.toast(`${Stickers.forName(v.name, v.category)} «${v.name}» qo'shildi`);
           } else {

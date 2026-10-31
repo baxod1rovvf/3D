@@ -503,6 +503,48 @@
     }
   }
 
+  /* ---------- grocery notification batching ----------
+     Many X / ✓ taps become ONE notification: sent 1 minute after the last tap, or as soon as
+     the page is hidden or left. The queue lives in localStorage, so a page change can't lose it;
+     a later batch on the same day says "yana". */
+  const GQ_KEY = "oila-grocery-queue", GQ_WAIT = 60 * 1000;
+  const GQ_LINK = { grocery_need: "rozgor.html?view=need", grocery_bought: "rozgor.html?view=bought" };
+  let gqTimer = null;
+  const gqKey = () => GQ_KEY + "-" + (Store.ctx ? Store.ctx.profile.id : "");
+  const gqRead = () => { try { return JSON.parse(localStorage.getItem(gqKey())) || {}; } catch (e) { return {}; } };
+  const gqWrite = (q) => { try { Object.keys(q).length ? localStorage.setItem(gqKey(), JSON.stringify(q)) : localStorage.removeItem(gqKey()); } catch (e) {} };
+  function queueGrocery(type, name) {
+    const q = gqRead();
+    const list = (q[type] = q[type] || []);
+    if (!list.includes(name)) list.push(name);
+    gqWrite(q);
+    clearTimeout(gqTimer);
+    gqTimer = setTimeout(flushGroceries, GQ_WAIT);
+  }
+  function unqueueGrocery(type, name) {
+    const q = gqRead();
+    if (!q[type]) return;
+    q[type] = q[type].filter((n) => n !== name);
+    if (!q[type].length) delete q[type];
+    gqWrite(q);
+  }
+  function flushGroceries() {
+    clearTimeout(gqTimer); gqTimer = null;
+    if (!Store.ctx) return;
+    const q = gqRead();
+    if (!Object.keys(q).length) return;
+    gqWrite({}); // claim first, so a second flush (hide + unload) can't send twice
+    const today = ymd(new Date());
+    for (const type of Object.keys(q)) {
+      const dayKey = `oila-grocery-last-${type}-${Store.ctx.profile.id}`;
+      let again = false;
+      try { again = localStorage.getItem(dayKey) === today; localStorage.setItem(dayKey, today); } catch (e) {}
+      Store.notify(type, { items: q[type], again }, GQ_LINK[type]);
+    }
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) flushGroceries(); });
+  window.addEventListener("pagehide", flushGroceries);
+
   /**
    * Boot a page: ensure this phone knows its family and person, render chrome, wire realtime.
    * opts: { page, title, sub, home, tables, render(ctx) }
@@ -517,6 +559,7 @@
     }
     if (!ctx || !ctx.profile) { location.replace("kirish.html"); return; }
     Store.ctx = ctx;
+    flushGroceries(); // a batch left over from a page that was closed mid-wait
 
     const app = $(".app");
     const tab = TABS.find((t) => t.id === opts.page);
@@ -578,6 +621,7 @@
   }
 
   window.App = {
+    queueGrocery, unqueueGrocery, flushGroceries,
     installState, install,
     boot, sheet, showPairCode, enterPairCode, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
     person, nameOf, firstName, isMe, avatar, timeAgo, greeting,

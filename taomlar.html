@@ -238,7 +238,7 @@ function sendToGrocery(ings, mealTitle) {
             if (g) await Store.update("grocery_items", g.id, { status: "kerak", marked_by: me, marked_at: now, purchased_by: null, purchased_at: null });
             else await Store.insert("grocery_items", { name: n, category: "boshqa", quantity: "", note: `«${mealTitle}» uchun`, urgent: false, status: "kerak", added_by: me, marked_by: me, marked_at: now });
           }
-          Store.notify("grocery_need", { item: chosen.join(", ") }, "rozgor.html?view=need");
+          Store.notify("grocery_need", { items: chosen }, "rozgor.html?view=need");
           App.toast(`${chosen.length} ta masalliq Ro'zg'orga yuborildi`, "shopping-basket");
           api.close(); groceries = await Store.list("grocery_items");
         } catch (e) { App.fail(e); $("[data-send]", el).disabled = false; }

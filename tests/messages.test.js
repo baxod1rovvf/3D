@@ -144,3 +144,16 @@ test("reviewed copy: no first-person or wrong-person endings", () => {
   assert.ok(endingsOf("grocery_need", "er").has("u bilan birga ro'yxatni ko'rib chiqing 📝"));
   assert.ok(endingsOf("grocery_bought", "er").has("kuchli yelkasi uchun rahmat ayting 💪"));
 });
+
+test("grocery batches: count, names, 'yana' and the 6-name limit", () => {
+  const r = () => 0;
+  const three = Messages.build("grocery_need", { actorRole: "xotin", items: ["Sut", "Non", "Tuxum"] }, r);
+  assert.equal(three.fixed, "Xotiningiz 3 ta mahsulotni kerak deb belgiladi: Sut, Non, Tuxum");
+  const later = Messages.build("grocery_need", { actorRole: "xotin", items: ["Guruch", "Tuz"], again: true }, r);
+  assert.equal(later.fixed, "Xotiningiz yana 2 ta mahsulotni kerak deb belgiladi: Guruch, Tuz");
+  assert.equal(Messages.build("grocery_need", { actorRole: "xotin", items: ["Sut"] }, r).fixed, "Xotiningiz «Sut»ni kerak deb belgiladi");
+  assert.equal(Messages.build("grocery_need", { actorRole: "er", items: ["Sut"], again: true }, r).fixed, "Eringiz yana «Sut»ni kerak deb belgiladi");
+  const many = Messages.build("grocery_bought", { actorRole: "er", items: ["a", "b", "c", "d", "e", "f", "g", "h"] }, r);
+  assert.equal(many.fixed, "Eringiz 8 ta mahsulotni oldi ✅: a, b, c, d, e, f va yana 2 ta");
+  assert.equal(Messages.activity("grocery_need", { actor: "Malika", items: ["Sut", "Non"], again: true }), "Malika yana 2 ta mahsulotni kerak deb belgiladi: Sut, Non");
+});

@@ -160,7 +160,11 @@
       if (!window.supabase) await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0/dist/umd/supabase.js");
       if (!clients[k]) clients[k] = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
         auth: { persistSession: false, autoRefreshToken: false },
-        global: { headers: { "x-family-key": k || "" } },
+        global: {
+          headers: { "x-family-key": k || "" },
+          // keepalive lets a small request (a notification sent while the page closes) finish after unload.
+          fetch: (url, init = {}) => fetch(url, { ...init, keepalive: typeof init.body === "string" && init.body.length < 60000 }),
+        },
       });
       return clients[k];
     }
