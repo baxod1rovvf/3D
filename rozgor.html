@@ -68,6 +68,12 @@
     .sticker-preview.pop { animation: wiggle-pop 420ms var(--bounce); }
   }
   @keyframes wiggle-pop { 0% { transform: scale(.6) rotate(-12deg); } 60% { transform: scale(1.15) rotate(6deg); } 100% { transform: none; } }
+  .search { position: relative; margin-top: 12px; }
+  .search > svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
+  .search .input { padding-left: 42px; padding-right: 48px; }
+  .search .input::-webkit-search-cancel-button { display: none; }
+  .search-clear { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; background: none; color: var(--muted); display: grid; place-items: center; }
+  .search-clear svg { width: 18px; height: 18px; }
 </style>
 </head>
 <body>
@@ -77,6 +83,11 @@
       <button role="tab" data-view="all">Hammasi</button>
       <button role="tab" data-view="need">Kerak <span class="count" id="c-need">0</span></button>
       <button role="tab" data-view="bought">Xarid qilindi <span class="count" id="c-bought">0</span></button>
+    </div>
+    <div class="search" role="search">
+      <i data-lucide="search" aria-hidden="true"></i>
+      <input class="input" id="q" type="search" placeholder="Mahsulot qidirish… 🔍" aria-label="Mahsulot qidirish" autocomplete="off" enterkeyhint="search">
+      <button class="search-clear" id="q-clear" aria-label="Qidiruvni tozalash" hidden><i data-lucide="x"></i></button>
     </div>
     <div id="list"></div>
   </main>
@@ -164,6 +175,10 @@ function grouped(list, rowFn) {
   }).join("");
 }
 
+let query = "";
+// Search matches the product name or note, ignoring case and apostrophe variants (o' / o‘ / oʻ).
+const matches = (i) => !query || Stickers.normalize(`${i.name} ${i.note || ""}`).includes(query);
+
 function draw() {
   if (!loaded) { $("#list").innerHTML = `<div class="skeleton" style="height:220px;margin-top:18px"></div>`; return; }
   const need = items.filter((i) => i.status === "kerak").sort((a, b) => (b.urgent - a.urgent) || ((a.marked_at || "") > (b.marked_at || "") ? -1 : 1));
@@ -171,6 +186,18 @@ function draw() {
   $("#c-need").textContent = need.length;
   $("#c-bought").textContent = bought.length;
   let html = "";
+  if (query) {
+    const hits = (view === "need" ? need : view === "bought" ? bought : items).filter(matches);
+    const rowFn = view === "need" ? rowNeed : view === "bought" ? rowBought : rowAll;
+    const raw = $("#q").value.trim();
+    $("#list").innerHTML = hits.length ? grouped(hits, rowFn)
+      : `<div class="empty" style="margin-top:30px"><div class="ico emo" aria-hidden="true">🔍</div><strong>«${esc(raw)}» topilmadi</strong><p>Bu ro'yxatda bunday mahsulot yo'q.</p>
+         <button class="btn primary" id="add-found"><i data-lucide="plus"></i>«${esc(raw)}» ni qo'shish</button></div>`;
+    const add = $("#add-found");
+    if (add) add.addEventListener("click", () => { openEditor(); setTimeout(() => { const n = $("#g-name"); if (n) { n.value = raw; n.dispatchEvent(new Event("input")); } }, 50); });
+    icons();
+    return;
+  }
   if (view === "all") {
     html = `<div class="legend"><span><i style="background:var(--danger)"></i>Uyda yo'q — kerak</span><span><i style="background:var(--sage-soft);box-shadow:inset 0 0 0 1.5px #13774A"></i>Olingan</span>
       <button class="link-btn" id="history" style="margin-left:auto"><i data-lucide="history" style="width:14px;height:14px;vertical-align:-2px"></i> Tarix</button></div>`;
@@ -322,6 +349,12 @@ async function openHistory() {
 
 $$(".segmented button").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
 $("#add").addEventListener("click", () => openEditor());
+$("#q").addEventListener("input", (e) => {
+  query = Stickers.normalize(e.target.value);
+  $("#q-clear").hidden = !e.target.value;
+  draw();
+});
+$("#q-clear").addEventListener("click", () => { const q = $("#q"); q.value = ""; q.dispatchEvent(new Event("input")); q.focus(); });
 setView(view);
 App.boot({ page: "rozgor", title: "Ro'zg'or", emoji: "🛒", sub: "Uyda nima yo'q — darhol ko'rinadi", tables: ["grocery_items"], render }).then(() => {
   if (new URLSearchParams(location.search).get("new")) openEditor();
