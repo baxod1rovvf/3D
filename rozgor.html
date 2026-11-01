@@ -76,14 +76,21 @@
   .gift button { width: 100%; min-height: 44px; border: 0; border-radius: 14px; background: var(--accent-fill); color: var(--on-accent); font-weight: 800; font-size: 15px; }
   .gift button:disabled { background: var(--accent-soft); color: var(--accent-ink); }
   .gift-intro { margin: 14px 2px 0; color: var(--ink-2); font-size: 14px; }
-  .cat-strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 4px -16px 12px; padding: 2px 16px 4px; }
+  /* Categories: a compact tab strip (emoji over a short label) on a tinted rail. */
+  .cat-strip { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 6px 16px; background: var(--accent-soft); border-radius: 0; }
   .cat-strip::-webkit-scrollbar { display: none; }
-  .cat-strip button { flex: none; white-space: nowrap; }
-  .cat-strip button, .pick-chips button { border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 12px; min-height: 44px; font-weight: 700; font-size: 14px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
-  .cat-strip button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-soft); }
-  .pick-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .pick-chips button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-fill); color: var(--on-accent); }
-  .pick-chips button:disabled { opacity: .55; }
+  .cat-strip button { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 72px; min-height: 56px; padding: 6px 8px; border: 0; border-radius: 14px; background: transparent; color: var(--ink-2); font-size: 11.5px; font-weight: 700; line-height: 1.15; white-space: nowrap; }
+  .cat-strip button .emo { font-size: 22px; }
+  .cat-strip button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 0 var(--accent-ink); }
+  .step-label { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .step-label b { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-fill); color: var(--on-accent); font-size: 11px; }
+  /* Products: a grid of tiles, clearly different from the category strip. */
+  .pick-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pick-chips button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 84px; padding: 8px 4px; border: 2px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); font-size: 12.5px; font-weight: 700; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+  .pick-chips button .emo { font-size: 30px; }
+  .pick-chips button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-soft); }
+  .pick-chips button[aria-pressed="true"]::after { content: "✓"; position: absolute; top: 4px; right: 6px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-fill); color: var(--on-accent); font-size: 12px; line-height: 20px; }
+  .pick-chips button:disabled { opacity: .5; }
   .search { position: relative; margin-top: 12px; }
   .search > svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
   .search .input { padding-left: 42px; padding-right: 48px; }
@@ -315,7 +322,9 @@ function openAdder() {
     body: `<div class="field"><label for="a-own">Mahsulot nomi</label>
         <div class="name-row"><span class="sticker lg sticker-preview" id="a-sticker" aria-hidden="true">🛒</span><input class="input" id="a-own" autocomplete="off" maxlength="200" placeholder="masalan, Sabzi, Piyoz" autofocus></div>
         <span class="hint">Pastdan tanlang yoki o'zingiz yozing. Bir nechta bo'lsa — vergul bilan.</span></div>
+      <div class="step-label"><b>1</b>Turkum</div>
       <div class="cat-strip" id="a-cats" role="group" aria-label="Turkum"></div>
+      <div class="step-label"><b>2</b>Mahsulotni tanlang</div>
       <div class="pick-chips" id="a-picks" role="group" aria-label="Mahsulotlar"></div>`,
     foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn primary" data-save disabled>Qo'shish</button>`,
     onMount(el, api) {

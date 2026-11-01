@@ -173,7 +173,7 @@
           e.preventDefault();
           try { await Store.update("notifications", a.dataset.id, { read: true }); } catch (err) {}
           const href = a.getAttribute("href");
-          if (href && href !== "#" && !location.pathname.endsWith(href)) location.href = href;
+          if (href && href !== "#" && !location.pathname.endsWith(href)) { api.close(); go(href); }
           else { await refreshBell(); api.close(); }
         });
       },
@@ -550,8 +550,10 @@
    * opts: { page, title, sub, home, tables, render(ctx) }
    */
   async function boot(opts) {
+    teardownPage();
+    const gen = pageGen;
     let ctx;
-    try { ctx = await Store.session(); }
+    try { ctx = Store.ctx || await Store.session(); }
     catch (e) {
       console.error(e);
       $(".app").innerHTML = `<div class="empty" style="margin:auto"><div class="ico"><i data-lucide="wifi-off"></i></div><strong>Ulanib bo'lmadi</strong><p>Internetni tekshirib, qayta urinib ko'ring.</p><button class="btn primary" onclick="location.reload()">Qayta urinish</button></div>`;
@@ -577,8 +579,9 @@
 
     await refreshBell();
     let pending = null;
-    const rerender = () => { clearTimeout(pending); pending = setTimeout(() => opts.render && opts.render(ctx), 120); };
-    Store.subscribe(Array.from(new Set([...(opts.tables || []), "notifications"])), (table, payload) => {
+    const rerender = () => { clearTimeout(pending); pending = setTimeout(() => gen === pageGen && opts.render && opts.render(ctx), 120); };
+    onLeave(() => clearTimeout(pending));
+    const unsubscribe = Store.subscribe(Array.from(new Set([...(opts.tables || []), "notifications"])), (table, payload) => {
       if (table === "notifications" || table === "*") {
         refreshBell();
         if (payload && payload.eventType === "INSERT" && payload.new && payload.new.recipient_id === ctx.profile.id) {
@@ -588,11 +591,14 @@
       }
       if (table === "*" || (opts.tables || []).includes(table)) rerender();
     });
+    onLeave(() => { if (typeof unsubscribe === "function") unsubscribe(); });
     if (opts.render) await opts.render(ctx);
     icons();
     checkReminders();
-    setInterval(checkReminders, 60000);
+    const remindTimer = setInterval(checkReminders, 60000);
+    onLeave(() => clearInterval(remindTimer));
     resyncPush(ctx);
+    prefetchPages();
   }
 
   /* ---------- installable app ---------- */
@@ -620,21 +626,88 @@
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch((e) => console.warn("sw", e)));
   }
 
-  // Chrome on Android starts rendering a section as soon as its tab is touched, so the switch
-  // feels instant even though every section is its own page.
-  try {
-    if (HTMLScriptElement.supports && HTMLScriptElement.supports("speculationrules")) {
-      const s = document.createElement("script");
-      s.type = "speculationrules";
-      s.textContent = JSON.stringify({ prerender: [{ source: "list", urls: TABS.map((t) => t.href), eagerness: "moderate" }] });
-      document.head.appendChild(s);
+  /* ---------- instant section switching (one page, like a single index.html) ----------
+     Every section is still its own HTML file (bookmarks, reloads and offline keep working),
+     but tab taps no longer load a new document: the target page is fetched once (then kept in
+     memory), its .app content and page styles are swapped in, and its script runs again inside
+     its own function scope. Each page script gets App.$/$$ bound to ITS OWN .app element, so a
+     late callback from the page you left can only touch its detached old DOM. */
+  const SPA_PAGES = TABS.map((t) => t.href);
+  const pageCache = new Map();
+  let pageGen = 0, leaveFns = [];
+  const onLeave = (fn) => leaveFns.push(fn);
+  function teardownPage() { const fns = leaveFns; leaveFns = []; fns.forEach((fn) => { try { fn(); } catch (e) {} }); }
+  const pageOf = (href) => { try { const u = new URL(href, location.href); return u.origin === location.origin && SPA_PAGES.includes(u.pathname.split("/").pop() || "index.html") ? u : null; } catch (e) { return null; } };
+
+  function loadPage(file) {
+    if (!pageCache.has(file)) {
+      pageCache.set(file, fetch(file, { credentials: "same-origin" }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); }).then((html) => {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const app = doc.querySelector(".app");
+        const script = [...doc.querySelectorAll("body script:not([src])")].map((x) => x.textContent).join("\n");
+        if (!app || !script) throw new Error("not an app page");
+        return { title: doc.title, styles: [...doc.head.querySelectorAll("style")].map((x) => x.textContent), attrs: [...app.attributes].map((a) => [a.name, a.value]), html: app.innerHTML, script };
+      }).catch((e) => { pageCache.delete(file); throw e; }));
     }
-  } catch (e) {}
+    return pageCache.get(file);
+  }
+  function prefetchPages() {
+    if (prefetchPages.done) return; prefetchPages.done = true;
+    const run = () => SPA_PAGES.forEach((f) => loadPage(f).catch(() => {}));
+    (window.requestIdleCallback || ((fn) => setTimeout(fn, 300)))(run);
+  }
+
+  async function go(href, push = true) {
+    const url = pageOf(href);
+    if (!url || !Store.ctx) { location.href = href; return; }
+    const file = url.pathname.split("/").pop() || "index.html";
+    let page;
+    try { page = await loadPage(file); } catch (e) { location.href = href; return; }
+    flushGroceries(); // what pagehide used to do
+    teardownPage();
+    pageGen++;
+    document.querySelectorAll(".sheet, .sheet-backdrop").forEach((n) => n.remove());
+    document.head.querySelectorAll("style").forEach((n) => n.remove());
+    page.styles.forEach((css) => { const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st); });
+    const old = document.querySelector(".app");
+    const app = document.createElement("div");
+    page.attrs.forEach(([k, v]) => app.setAttribute(k, v));
+    app.innerHTML = page.html;
+    old.replaceWith(app);
+    document.title = page.title;
+    if (push) history.pushState({ spa: true }, "", url.pathname.split("/").pop() + url.search + url.hash);
+    // The new page script captures App.$/$$ scoped to its own .app element.
+    App.$ = (sel, root = app) => root.querySelector(sel);
+    App.$$ = (sel, root = app) => Array.from(root.querySelectorAll(sel));
+    const run = document.createElement("script");
+    run.textContent = "(function () {\n" + page.script + "\n})();";
+    document.body.appendChild(run);
+    run.remove();
+  }
+
+  // Intercept taps on links to the five sections (tab bar, quick actions, notification links).
+  document.addEventListener("click", (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (!a || a.target || a.hasAttribute("download") || !pageOf(a.getAttribute("href"))) return;
+    e.preventDefault();
+    go(a.getAttribute("href"));
+  });
+  window.addEventListener("popstate", () => { if (pageOf(location.href)) go(location.href, false); });
+
+  // The first page loaded normally also gets lookups bound to ITS .app (captured on first use),
+  // so a slow first render finishing after an in-app switch can't write into the next section.
+  let firstApp = null;
+  const firstRoot = () => firstApp || (firstApp = document.querySelector(".app")) || document;
+  const firstPage$ = (sel, root = firstRoot()) => root.querySelector(sel);
+  const firstPage$$ = (sel, root = firstRoot()) => Array.from(root.querySelectorAll(sel));
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", firstRoot, { once: true }); else firstRoot();
 
   window.App = {
+    go,
     queueGrocery, unqueueGrocery, flushGroceries,
     installState, install,
-    boot, sheet, showPairCode, enterPairCode, confirm: confirmSheet, toast, fail, icons, esc, $, $$,
+    boot, sheet, showPairCode, enterPairCode, confirm: confirmSheet, toast, fail, icons, esc, $: firstPage$, $$: firstPage$$,
     person, nameOf, firstName, isMe, avatar, timeAgo, greeting,
     ymd, parseYmd, today, addDays, fmtLong, fmtDate, fmtShort,
     MONTHS, WEEKDAYS, WEEKDAYS_SHORT, logoSvg, logoMark,

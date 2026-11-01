@@ -66,7 +66,7 @@
     { name: "Pirojniy", emoji: "🧁", verb: "ye" }, { name: "Qulupnay", emoji: "🍓", verb: "ye" },
     { name: "Uzum", emoji: "🍇", verb: "ye" }, { name: "Anor", emoji: "❤️", verb: "ye" },
     { name: "Ananas", emoji: "🍍", verb: "ye" }, { name: "Pitsa", emoji: "🍕", verb: "ye" },
-    { name: "Burger", emoji: "🍔", verb: "ye" }, { name: "Shaurma", emoji: "🌯", verb: "ye" },
+    { name: "Burger", emoji: "🍔", verb: "ye" }, { name: "Lavash", emoji: "🌯", verb: "ye" },
     { name: "Sharbat", emoji: "🧃", verb: "ich" }, { name: "Qahva", emoji: "☕", verb: "ich" },
     { name: "Milkshake", emoji: "🥤", verb: "ich" }, { name: "Yong'oq", emoji: "🌰", verb: "ye" },
   ];
