@@ -76,9 +76,11 @@
   .gift button { width: 100%; min-height: 44px; border: 0; border-radius: 14px; background: var(--accent-fill); color: var(--on-accent); font-weight: 800; font-size: 15px; }
   .gift button:disabled { background: var(--accent-soft); color: var(--accent-ink); }
   .gift-intro { margin: 14px 2px 0; color: var(--ink-2); font-size: 14px; }
-  .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .cat-chips button, .pick-chips button { border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 12px; min-height: 44px; font-weight: 700; font-size: 14px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
-  .cat-chips button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-soft); }
+  .cat-strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 4px -16px 12px; padding: 2px 16px 4px; }
+  .cat-strip::-webkit-scrollbar { display: none; }
+  .cat-strip button { flex: none; white-space: nowrap; }
+  .cat-strip button, .pick-chips button { border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 12px; min-height: 44px; font-weight: 700; font-size: 14px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+  .cat-strip button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-soft); }
   .pick-chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .pick-chips button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-fill); color: var(--on-accent); }
   .pick-chips button:disabled { opacity: .55; }
@@ -302,68 +304,78 @@ $("#list").addEventListener("click", async (e) => {
   setTimeout(() => { b.disabled = false; b.textContent = "Хочу 🥺"; }, 4000);
 });
 
-/* ---------- Add products: pick a category, tick several products, or type your own ---------- */
+/* ---------- Add products: name box on top (emoji on the left); a one-line category strip;
+   tapping a product chip writes it into the name box (several, comma-separated) ---------- */
 function openAdder() {
   let cat = CATS[0].id;
-  const picked = new Set();
   const norm = (n) => Stickers.normalize(n);
   const stateOf = (name) => { const it = items.find((i) => norm(i.name) === norm(name)); return it ? it.status : null; };
   App.sheet({
     title: "Bugun nima kerak? 🛍️",
-    body: `<div class="field"><span class="label">Turkum</span><div class="cat-chips" id="a-cats" role="group" aria-label="Turkum"></div></div>
-      <div class="field"><span class="label">Mahsulotlarni tanlang <span class="hint">(bir nechtasini)</span></span><div class="pick-chips" id="a-picks" role="group" aria-label="Mahsulotlar"></div></div>
-      <div class="field"><label for="a-own">Boshqa mahsulot</label>
-        <div class="name-row"><span class="sticker lg sticker-preview" id="a-sticker" aria-hidden="true">${CATS[0].emoji}</span><input class="input" id="a-own" autocomplete="off" maxlength="60" placeholder="ro'yxatda yo'q bo'lsa, yozing"></div></div>`,
+    body: `<div class="field"><label for="a-own">Mahsulot nomi</label>
+        <div class="name-row"><span class="sticker lg sticker-preview" id="a-sticker" aria-hidden="true">🛒</span><input class="input" id="a-own" autocomplete="off" maxlength="200" placeholder="masalan, Sabzi, Piyoz" autofocus></div>
+        <span class="hint">Pastdan tanlang yoki o'zingiz yozing. Bir nechta bo'lsa — vergul bilan.</span></div>
+      <div class="cat-strip" id="a-cats" role="group" aria-label="Turkum"></div>
+      <div class="pick-chips" id="a-picks" role="group" aria-label="Mahsulotlar"></div>`,
     foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn primary" data-save disabled>Qo'shish</button>`,
     onMount(el, api) {
-      const own = $("#a-own", el), save = $("[data-save]", el);
-      const count = () => picked.size + (own.value.trim() ? 1 : 0);
-      const refresh = () => { const n = count(); save.disabled = !n; save.innerHTML = n ? `Qo'shish (${n}) <span class="emo" aria-hidden="true">✨</span>` : "Qo'shish"; };
+      const own = $("#a-own", el), save = $("[data-save]", el), stk = $("#a-sticker", el);
+      const names = () => own.value.split(",").map((x) => x.trim()).filter(Boolean);
+      const has = (n) => names().some((x) => norm(x) === norm(n));
+      const refresh = () => {
+        const list = names(), n = list.length;
+        save.disabled = !n;
+        save.innerHTML = n ? `Qo'shish${n > 1 ? ` (${n})` : ""} <span class="emo" aria-hidden="true">✨</span>` : "Qo'shish";
+        const e = list.length ? emojiFor(list[list.length - 1], cat) : "🛒";
+        if (stk.textContent !== e) { stk.textContent = e; stk.classList.remove("pop"); void stk.offsetWidth; stk.classList.add("pop"); }
+        $$("[data-pick]", el).forEach((b) => b.setAttribute("aria-pressed", has(b.dataset.pick)));
+      };
       const drawCats = () => {
         $("#a-cats", el).innerHTML = CATS.map((c) => `<button type="button" data-cat="${c.id}" aria-pressed="${c.id === cat}"><span class="emo" aria-hidden="true">${c.emoji}</span>${esc(c.name)}</button>`).join("");
       };
       const drawPicks = () => {
         $("#a-picks", el).innerHTML = Catalog.category(cat).products.map((x) => {
-          const st = stateOf(x.name), on = picked.has(x.name);
-          return `<button type="button" data-pick="${esc(x.name)}" aria-pressed="${on}" ${st === "kerak" ? "disabled" : ""}><span class="emo" aria-hidden="true">${x.emoji}</span>${esc(x.name)}${st === "kerak" ? " ✓" : ""}</button>`;
+          const st = stateOf(x.name);
+          return `<button type="button" data-pick="${esc(x.name)}" aria-pressed="${has(x.name)}" ${st === "kerak" ? "disabled" : ""}><span class="emo" aria-hidden="true">${x.emoji}</span>${esc(x.name)}${st === "kerak" ? " ✓" : ""}</button>`;
         }).join("");
       };
       drawCats(); drawPicks();
-      $("#a-cats", el).addEventListener("click", (e) => { const b = e.target.closest("[data-cat]"); if (!b) return; cat = b.dataset.cat; drawCats(); drawPicks(); $("#a-sticker", el).textContent = emojiFor(own.value, cat); });
+      $("#a-cats", el).addEventListener("click", (e) => {
+        const b = e.target.closest("[data-cat]"); if (!b) return;
+        cat = b.dataset.cat; drawCats(); drawPicks(); refresh();
+        b.scrollIntoView({ inline: "nearest", block: "nearest" });
+      });
       $("#a-picks", el).addEventListener("click", (e) => {
         const b = e.target.closest("[data-pick]"); if (!b || b.disabled) return;
         const n = b.dataset.pick;
-        picked.has(n) ? picked.delete(n) : picked.add(n);
-        b.setAttribute("aria-pressed", picked.has(n)); refresh();
-      });
-      own.addEventListener("input", () => {
-        const prev = $("#a-sticker", el), e2 = emojiFor(own.value, cat);
-        if (prev.textContent !== e2) { prev.textContent = e2; prev.classList.remove("pop"); void prev.offsetWidth; prev.classList.add("pop"); }
+        const list = names();
+        own.value = (has(n) ? list.filter((x) => norm(x) !== norm(n)) : list.concat(n)).join(", ");
         refresh();
       });
-      own.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if (count()) save.click(); } });
+      own.addEventListener("input", refresh);
+      own.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if (names().length) save.click(); } });
       save.addEventListener("click", async () => {
-        const names = [...picked];
-        const typed = own.value.trim();
-        if (typed && !names.some((n) => norm(n) === norm(typed))) names.push(typed);
-        if (!names.length) return;
+        const list = [];
+        names().forEach((n) => { if (!list.some((x) => norm(x) === norm(n))) list.push(n); });
+        if (!list.length) return;
         save.disabled = true;
         const me = Store.ctx.profile.id, now = new Date().toISOString();
         let added = 0;
         try {
-          for (const name of names) {
+          for (const typed of list) {
+            const known = Catalog.find(typed);
+            const name = known ? known.name : typed;
             const found = items.find((i) => norm(i.name) === norm(name));
             if (found && found.status === "kerak") continue;
-            const category = (Catalog.find(name) || {}).category || cat;
             if (found) await Store.update("grocery_items", found.id, { status: "kerak", marked_by: me, marked_at: now, purchased_by: null, purchased_at: null });
             else {
-              const row = await Store.insert("grocery_items", { name, category, quantity: "", note: "", urgent: false, status: "kerak", added_by: me, marked_by: me, marked_at: now });
+              const row = await Store.insert("grocery_items", { name, category: known ? known.category : cat, quantity: "", note: "", urgent: false, status: "kerak", added_by: me, marked_by: me, marked_at: now });
               if (row && row.id) fresh = { id: row.id, t0: null };
             }
             App.queueGrocery("grocery_need", name);
             added++;
           }
-          App.toast(added ? `${added} ta mahsulot «Kerak» ro'yxatiga qo'shildi 🛒` : "Bular allaqachon ro'yxatda ✓", "shopping-basket");
+          App.toast(added ? `${added === 1 ? `«${list[0]}»` : `${added} ta mahsulot`} «Kerak» ro'yxatiga qo'shildi 🛒` : "Bular allaqachon ro'yxatda ✓", "shopping-basket");
           api.close(); render();
         } catch (err) { App.fail(err); save.disabled = false; }
       });

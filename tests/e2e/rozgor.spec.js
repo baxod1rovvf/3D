@@ -40,8 +40,14 @@ const LUCIDE = process.env.LUCIDE_PATH || "/tmp/claude-0/-home-user-3D/600534e3-
   assert.ok(!/Shoshilinch|Hozir kerak/.test(sheetText), "no urgent / needed toggles when adding");
   assert.strictEqual(await wife.locator(".sheet [data-cat]").count(), 9, "nine categories");
   await wife.click('.sheet [data-cat="gigiyena"]');
+  assert.ok(await wife.evaluate(() => { const r = document.querySelector("#a-cats"); return r.scrollHeight < 70 && r.scrollWidth > r.clientWidth; }), "categories sit on one scrolling line");
   for (const n of ["Sovun", "Tish pastasi", "Bolalar tagligi (pampers)"]) await wife.click(`.sheet [data-pick="${n}"]`);
-  await wife.fill("#a-own", "Bolalar sochiqchasi");
+  assert.strictEqual(await wife.inputValue("#a-own"), "Sovun, Tish pastasi, Bolalar tagligi (pampers)", "picked products are written into the name box");
+  assert.strictEqual((await wife.textContent("#a-sticker")).trim(), "👶", "emoji on the left follows the last product");
+  await wife.click('.sheet [data-pick="Tish pastasi"]'); // tap again: removed from the box
+  assert.strictEqual(await wife.inputValue("#a-own"), "Sovun, Bolalar tagligi (pampers)");
+  await wife.click('.sheet [data-pick="Tish pastasi"]');
+  await wife.focus("#a-own"); await wife.keyboard.press("End"); await wife.keyboard.type(", Bolalar sochiqchasi");
   assert.match(await wife.textContent(".sheet [data-save]"), /\(4\)/);
   await wife.click(".sheet [data-save]");
   await wife.waitForTimeout(600);
