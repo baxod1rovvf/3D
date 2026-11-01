@@ -24,7 +24,7 @@
   .weeknav { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
   .weeknav .label { flex: 1; text-align: center; font-family: var(--display); font-weight: 600; font-size: 17px; }
   .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-  .day { border: 2px solid transparent; background: #fff; border-radius: 16px; padding: 7px 0 6px; min-height: 64px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink-2); transition: background var(--t) var(--ease), transform var(--t-fast) var(--bounce); }
+  .day { border: 2px solid transparent; background: var(--surface); border-radius: 16px; padding: 7px 0 6px; min-height: 64px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink-2); transition: background var(--t) var(--ease), transform var(--t-fast) var(--bounce); }
   .day:active { transform: scale(.94); }
   .day .wd { font-size: 11.5px; font-weight: 800; color: var(--muted); }
   .day .dn { font-size: 18px; font-weight: 600; font-family: var(--display); }
@@ -49,7 +49,7 @@
   .meal p { margin: 3px 0 0; font-size: 13.5px; color: var(--ink-2); font-weight: 600; }
   .ings { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .chip.ing { background: var(--accent-soft); border-color: transparent; color: var(--ink); padding: 3px 10px 3px 4px; font-size: 12.5px; }
-  .chip.ing .emo { width: 22px; height: 22px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 13px; }
+  .chip.ing .emo { width: 22px; height: 22px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; font-size: 13px; }
   .add-slot { margin-top: 10px; width: 100%; min-height: 48px; border: 2px dashed var(--accent); border-radius: 16px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .add-slot svg { width: 16px; height: 16px; }
 

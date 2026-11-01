@@ -7,6 +7,9 @@
 :root {
   --bg: #FFF8EC;            /* light cream */
   --surface: #FFFFFF;
+  --page: #FDEFD6;          /* around the phone frame on wide screens */
+  --toast-bg: #2B2440;
+  --skel-a: #F6EBDA; --skel-b: #FFF6E8;
   --surface-2: #FFF3E0;
   --ink: #2B2440;
   --ink-2: #4E4766;
@@ -51,7 +54,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; }
 body {
-  background: #FDEFD6;
+  background: var(--page);
   color: var(--ink);
   font-family: var(--font);
   font-size: 15px;
@@ -128,7 +131,7 @@ img { display: block; max-width: 100%; }
   min-width: 20px; height: 20px; padding: 0 5px;
   border-radius: 10px; background: var(--danger); color: #fff;
   font-size: 11px; font-weight: 800; line-height: 16px; text-align: center;
-  border: 2px solid #fff;
+  border: 2px solid var(--surface);
 }
 
 .avatars { display: flex; }
@@ -136,7 +139,7 @@ img { display: block; max-width: 100%; }
   width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center;
   color: #fff; font-family: var(--display); font-weight: 600; font-size: 14px;
-  border: 2px solid #fff; flex: none;
+  border: 2px solid var(--surface); flex: none;
 }
 .avatars .avatar + .avatar { margin-left: -10px; }
 .avatar.sm { width: 24px; height: 24px; font-size: 11px; border-width: 1.5px; }
@@ -151,7 +154,7 @@ img { display: block; max-width: 100%; }
   flex: none;
   display: grid; grid-template-columns: repeat(5, 1fr);
   padding: 6px 6px calc(6px + var(--safe-b));
-  background: #fff;
+  background: var(--surface);
   border-top: 2px solid var(--line);
   view-transition-name: tabbar;
 }
@@ -201,7 +204,7 @@ img { display: block; max-width: 100%; }
   display: grid; place-items: center;
   border-radius: 50%;
   background: var(--accent-soft);
-  border: 2px solid #fff;
+  border: 2px solid var(--surface);
   box-shadow: 0 0 0 2px var(--accent-soft), 0 3px 6px rgba(43, 36, 64, .12);
   font-size: 23px; line-height: 1;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
@@ -261,7 +264,7 @@ img { display: block; max-width: 100%; }
 .app:has(.fab) .main { padding-bottom: 100px; }
 .fab {
   position: absolute; right: 16px; bottom: calc(var(--tabbar-h) + var(--safe-b) + 18px);
-  width: 60px; height: 60px; border-radius: 22px; border: 3px solid #fff;
+  width: 60px; height: 60px; border-radius: 22px; border: 3px solid var(--surface);
   background: var(--accent-fill); color: var(--on-accent);
   display: grid; place-items: center;
   box-shadow: 0 5px 0 var(--accent-deep), var(--shadow-lg); z-index: 20;
@@ -276,7 +279,7 @@ img { display: block; max-width: 100%; }
 .input, .select, .textarea {
   width: 100%; min-height: 48px; padding: 11px 14px;
   border: 2px solid var(--line-2); border-radius: 16px;
-  background: #fff; font-size: 16px; outline: none;
+  background: var(--surface); font-size: 16px; outline: none;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 .textarea { min-height: 84px; resize: vertical; line-height: 1.45; }
@@ -293,7 +296,7 @@ img { display: block; max-width: 100%; }
 .choice span {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 46px; padding: 8px 10px; border-radius: 16px;
-  border: 2px solid var(--line-2); background: #fff;
+  border: 2px solid var(--line-2); background: var(--surface);
   font-size: 14px; font-weight: 700; text-align: center;
   transition: all var(--t-fast);
 }
@@ -302,7 +305,7 @@ img { display: block; max-width: 100%; }
 
 .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .switch input { appearance: none; width: 50px; height: 30px; border-radius: 15px; background: var(--line-2); position: relative; transition: background var(--t); flex: none; }
-.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform var(--t) var(--bounce); }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform var(--t) var(--bounce); }
 .switch input:checked { background: var(--accent); }
 .switch input:checked::after { transform: translateX(20px); }
 
@@ -339,11 +342,13 @@ img { display: block; max-width: 100%; }
 .toast {
   display: flex; align-items: center; gap: 10px;
   padding: 13px 16px; border-radius: 20px;
-  background: var(--ink); color: #fff; font-size: 14.5px; font-weight: 700;
+  background: var(--toast-bg); color: #fff; font-size: 14.5px; font-weight: 700;
   box-shadow: 0 4px 0 var(--accent), var(--shadow-lg);
   pointer-events: auto;
 }
 .toast svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.toast span { flex: 1; }
+.toast-action { pointer-events: auto; flex: none; min-height: 40px; padding: 0 12px; margin: -6px -6px -6px 4px; border: 0; border-radius: 12px; background: var(--accent-fill); color: var(--on-accent); font-weight: 800; font-size: 13.5px; }
 
 /* ---------- Empty states ---------- */
 .empty { text-align: center; padding: 28px 20px; color: var(--muted); }
@@ -366,14 +371,14 @@ img { display: block; max-width: 100%; }
 
 .demo-banner {
   margin: 0 16px 8px; padding: 6px 8px 6px 12px; border-radius: 16px;
-  background: #fff; border: 2px dashed var(--line-2); color: var(--ink-2); font-size: 12.5px; font-weight: 600;
+  background: var(--surface); border: 2px dashed var(--line-2); color: var(--ink-2); font-size: 12.5px; font-weight: 600;
   display: flex; align-items: center; gap: 8px;
 }
 .demo-banner svg { width: 16px; height: 16px; flex: none; }
 .demo-banner button { margin-left: auto; border: 0; background: var(--accent-soft); border-radius: 12px; padding: 0 12px; min-height: 36px; font-size: 12.5px; font-weight: 800; color: var(--ink); white-space: nowrap; }
 
 /* ---------- Skeleton ---------- */
-.skeleton { background: linear-gradient(90deg, #F6EBDA 25%, #FFF6E8 50%, #F6EBDA 75%); background-size: 200% 100%; border-radius: 22px; }
+.skeleton { background: linear-gradient(90deg, var(--skel-a) 25%, var(--skel-b) 50%, var(--skel-a) 75%); background-size: 200% 100%; border-radius: 22px; }
 
 /* ---------- Device pairing code ---------- */
 .pair-code { display: flex; justify-content: center; gap: 6px; margin: 6px 0; }
@@ -430,4 +435,35 @@ img { display: block; max-width: 100%; }
   .main { padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 24px); }
   .app:has(.fab) .main { padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 100px); }
   .fab { position: fixed; z-index: 41; }
+}
+
+
+/* ---------- Dark mode: "Avto" follows the phone, or forced in Settings (html[data-theme]) ---------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #17131F; --surface: #231D30; --surface-2: #2C2540; --page: #0F0C15;
+  --ink: #F3EEFF; --ink-2: #D2C9EA; --muted: #A9A0C4; --line: #362D4A; --line-2: #463B5E;
+  --sage-soft: #1D3A2C; --honey-soft: #3A2F12; --danger-soft: #3D1A22; --danger-ink: #FF8A96;
+  --toast-bg: #3B3352; --skel-a: #2A2338; --skel-b: #342C45; --need-bg: #3A1C25;
+  --shadow: 0 3px 0 rgba(0, 0, 0, .35), 0 8px 22px rgba(0, 0, 0, .35);
+}
+:root[data-theme="dark"] [data-section="home"], :root[data-theme="dark"] .app:not([data-section]) { --accent-soft: #3A2E0E; --accent-ink: #FFD166; }
+:root[data-theme="dark"] [data-section="rozgor"] { --accent-soft: #143327; --accent-ink: #6EE7A8; }
+:root[data-theme="dark"] [data-section="taomlar"] { --accent-soft: #3D2016; --accent-ink: #FFA07A; }
+:root[data-theme="dark"] [data-section="xotiralar"] { --accent-soft: #3D1726; --accent-ink: #FF9AB8; }
+:root[data-theme="dark"] [data-section="uy-ishlari"] { --accent-soft: #24224A; --accent-ink: #ADA8FF; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #17131F; --surface: #231D30; --surface-2: #2C2540; --page: #0F0C15;
+    --ink: #F3EEFF; --ink-2: #D2C9EA; --muted: #A9A0C4; --line: #362D4A; --line-2: #463B5E;
+    --sage-soft: #1D3A2C; --honey-soft: #3A2F12; --danger-soft: #3D1A22; --danger-ink: #FF8A96;
+    --toast-bg: #3B3352; --skel-a: #2A2338; --skel-b: #342C45; --need-bg: #3A1C25;
+    --shadow: 0 3px 0 rgba(0, 0, 0, .35), 0 8px 22px rgba(0, 0, 0, .35);
+  }
+  :root:not([data-theme="light"]) [data-section="home"], :root:not([data-theme="light"]) .app:not([data-section]) { --accent-soft: #3A2E0E; --accent-ink: #FFD166; }
+  :root:not([data-theme="light"]) [data-section="rozgor"] { --accent-soft: #143327; --accent-ink: #6EE7A8; }
+  :root:not([data-theme="light"]) [data-section="taomlar"] { --accent-soft: #3D2016; --accent-ink: #FFA07A; }
+  :root:not([data-theme="light"]) [data-section="xotiralar"] { --accent-soft: #3D1726; --accent-ink: #FF9AB8; }
+  :root:not([data-theme="light"]) [data-section="uy-ishlari"] { --accent-soft: #24224A; --accent-ink: #ADA8FF; }
 }

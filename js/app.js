@@ -70,14 +70,27 @@
   }
 
   /* ---------- toast ---------- */
-  function toast(text, icon = "check") {
+  function toast(text, icon = "check", action) {
     let wrap = $(".toast-wrap");
     if (!wrap) { wrap = document.createElement("div"); wrap.className = "toast-wrap"; wrap.setAttribute("role", "status"); wrap.setAttribute("aria-live", "polite"); $(".app").appendChild(wrap); }
     const t = document.createElement("div");
     t.className = "toast";
     t.innerHTML = `<i data-lucide="${icon}"></i><span>${esc(text)}</span>`;
+    const hide = () => { if (t.classList.contains("out")) return; t.classList.add("out"); setTimeout(() => t.remove(), 220); };
+    if (action) {
+      // An action toast (e.g. "Bekor qilish"): stays longer and takes taps.
+      const b = document.createElement("button");
+      b.className = "toast-action"; b.type = "button"; b.textContent = action.label;
+      b.addEventListener("click", () => { hide(); action.onClick(); });
+      t.appendChild(b);
+    }
     wrap.appendChild(t); icons();
-    setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 220); }, 2600);
+    setTimeout(hide, action ? action.ms || 5000 : 2600);
+    return hide;
+  }
+  /** "Done — Bekor qilish": runs undo() if tapped within 5 seconds. */
+  function undoToast(text, undo, icon = "check") {
+    return toast(text, icon, { label: "Bekor qilish", ms: 5000, onClick: undo });
   }
   function fail(e) {
     console.error(e);
@@ -393,6 +406,7 @@
   }
 
   function openProfile() {
+    const quiet = quietPrefs();
     const c = Store.ctx;
     const demo = Store.mode === "demo";
     const leads = [[1, "1 soat"], [2, "2 soat"], [3, "3 soat"], [0, "O'chiq"]];
@@ -419,6 +433,20 @@
             <div class="field" style="margin-bottom:0"><span class="label" id="lead-label">Qancha oldin eslatilsin?</span>
               <div class="choice" data-lead role="radiogroup" aria-labelledby="lead-label">${leads.map(([n, t]) => `<label><input type="radio" name="lead" value="${n}"${n === 2 ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
             </div>
+          </div></div>
+        <div class="section"><div class="section-head"><h2>🌙 Tinch soatlar</h2></div>
+          <div class="card" style="padding:14px">
+            <label class="switch"><span class="title">Kechasi ovozsiz</span><input type="checkbox" data-quiet-on${quiet.on ? " checked" : ""}></label>
+            <div class="field-row" style="margin-top:10px">
+              <div class="field" style="margin-bottom:0"><label for="quiet-from">Boshlanishi</label><input class="input" id="quiet-from" type="time" data-quiet-from value="${quiet.from}"></div>
+              <div class="field" style="margin-bottom:0"><label for="quiet-to">Tugashi</label><input class="input" id="quiet-to" type="time" data-quiet-to value="${quiet.to}"></div>
+            </div>
+            <p class="hint" style="margin:10px 0 0">Bu vaqtda xabarlar keladi, lekin telefon jiringlamaydi va titramaydi. Faqat shu telefon uchun.</p>
+          </div></div>
+        <div class="section"><div class="section-head"><h2>🎨 Ko'rinish</h2></div>
+          <div class="card" style="padding:14px">
+            <div class="choice" data-theme-choice role="radiogroup" aria-label="Ko'rinish">${[["auto", "📱 Avto"], ["light", "☀️ Yorug'"], ["dark", "🌙 Qorong'i"]].map(([v, t]) => `<label><input type="radio" name="theme" value="${v}"${theme() === v ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
+            <p class="hint" style="margin:10px 0 0">«Avto» telefon sozlamasiga qarab o'zgaradi.</p>
           </div></div>
         <div class="section"><div class="section-head"><h2>\uD83D\uDCF1 Qurilmalar</h2></div>
           <div class="card list">
@@ -452,6 +480,11 @@
           } catch (e) { fail(e); }
           refreshPush();
         });
+        // Quiet hours (this phone) and theme.
+        const qOn = $("[data-quiet-on]", el), qFrom = $("[data-quiet-from]", el), qTo = $("[data-quiet-to]", el);
+        const saveQuietUI = () => { saveQuiet({ on: qOn.checked, from: qFrom.value || "23:00", to: qTo.value || "07:00" }); };
+        [qOn, qFrom, qTo].forEach((x) => x.addEventListener("change", () => { saveQuietUI(); toast(qOn.checked ? `🌙 ${qFrom.value}–${qTo.value} ovozsiz` : "Tinch soatlar o'chirildi", "moon"); }));
+        $("[data-theme-choice]", el).addEventListener("change", (e) => { setTheme(e.target.value); });
         $("[data-push-test]", el).addEventListener("click", async () => {
           try { await Store.notify("test", {}, null, { toSelf: true }); toast("Sinov xabari yuborildi", "send"); } catch (e) { fail(e); }
         });
@@ -488,6 +521,30 @@
       },
     });
   }
+
+  /* ---------- per-phone preferences: quiet hours and theme ----------
+     Quiet hours are read by the service worker when a push arrives, so they are mirrored into
+     Cache Storage (the worker can't read localStorage). */
+  const QUIET_KEY = "oila-quiet", THEME_KEY = "oila-theme";
+  function quietPrefs() {
+    try { return { on: false, from: "23:00", to: "07:00", ...(JSON.parse(localStorage.getItem(QUIET_KEY)) || {}) }; }
+    catch (e) { return { on: false, from: "23:00", to: "07:00" }; }
+  }
+  function saveQuiet(q) {
+    try { localStorage.setItem(QUIET_KEY, JSON.stringify(q)); } catch (e) {}
+    if (window.caches) caches.open("oila-prefs").then((c) => c.put("prefs/quiet", new Response(JSON.stringify(q), { headers: { "Content-Type": "application/json" } }))).catch(() => {});
+  }
+  const theme = () => { try { return localStorage.getItem(THEME_KEY) || "auto"; } catch (e) { return "auto"; } };
+  function applyTheme(t = theme()) {
+    const root = document.documentElement;
+    if (t === "auto") delete root.dataset.theme; else root.dataset.theme = t;
+    const dark = t === "dark" || (t === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", dark ? "#17131F" : "#FFF8EC");
+  }
+  function setTheme(t) { try { localStorage.setItem(THEME_KEY, t); } catch (e) {} applyTheme(t); }
+  applyTheme(); // runs in <head>, before the page paints
+  if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme());
 
   /* ---------- task reminders (runs on every page) ---------- */
   async function checkReminders() {
@@ -704,10 +761,10 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", firstRoot, { once: true }); else firstRoot();
 
   window.App = {
-    go,
+    go, onLeave,
     queueGrocery, unqueueGrocery, flushGroceries,
     installState, install,
-    boot, sheet, showPairCode, enterPairCode, confirm: confirmSheet, toast, fail, icons, esc, $: firstPage$, $$: firstPage$$,
+    boot, sheet, showPairCode, enterPairCode, confirm: confirmSheet, toast, undoToast, fail, icons, esc, $: firstPage$, $$: firstPage$$,
     person, nameOf, firstName, isMe, avatar, timeAgo, greeting,
     ymd, parseYmd, today, addDays, fmtLong, fmtDate, fmtShort,
     MONTHS, WEEKDAYS, WEEKDAYS_SHORT, logoSvg, logoMark,

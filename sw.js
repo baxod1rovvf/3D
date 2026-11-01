@@ -1,5 +1,5 @@
 /* Oila Uchun service worker: offline app shell, plus Web Push display. All URLs are relative to the SW scope. */
-const CACHE = "oila-v3";
+const CACHE = "oila-v4";
 const SHELL = [
   "./", "index.html", "rozgor.html", "taomlar.html", "xotiralar.html", "uy-ishlari.html", "kirish.html",
   "css/app.css", "js/stickers.js", "js/catalog.js", "js/messages.js", "js/reminders.js", "js/store.js", "js/app.js",
@@ -11,7 +11,7 @@ self.addEventListener("install", (e) => {
 });
 
 self.addEventListener("activate", (e) => {
-  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k.startsWith("oila-v")).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 // Pinned third-party files (Lucide, supabase-js, Google Fonts): versioned URLs, so cache-first forever.
@@ -44,19 +44,33 @@ self.addEventListener("fetch", (e) => {
   }));
 });
 
+// Quiet hours ("Tinch soatlar", set per phone in Settings): the notification still arrives,
+// but silently — no sound, no vibration.
+async function inQuietHours(now = new Date()) {
+  try {
+    const res = await (await caches.open("oila-prefs")).match("prefs/quiet");
+    const q = res ? await res.json() : null;
+    if (!q || !q.on) return false;
+    const mins = (hhmm) => { const [h, m] = String(hhmm).split(":").map(Number); return h * 60 + (m || 0); };
+    const t = now.getHours() * 60 + now.getMinutes(), from = mins(q.from), to = mins(q.to);
+    return from <= to ? t >= from && t < to : t >= from || t < to; // e.g. 23:00–07:00 wraps midnight
+  } catch (e) { return false; }
+}
+
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
   d = d || {}; // a literal JSON null payload
-  e.waitUntil(self.registration.showNotification(d.title || "Oila Uchun", {
+  e.waitUntil(inQuietHours().then((quiet) => self.registration.showNotification(d.title || "Oila Uchun", {
     body: d.body || "",
     tag: d.tag,
-    renotify: !!d.tag, // a repeated tag still buzzes
-    vibrate: d.vibrate,
+    renotify: !!d.tag && !quiet, // a repeated tag still buzzes (except in quiet hours)
+    silent: quiet,
+    vibrate: quiet ? [] : d.vibrate,
     icon: "assets/icon-192.png",
     badge: "assets/icon-192.png",
     data: { url: d.url || "index.html" },
-  }));
+  })));
 });
 
 self.addEventListener("notificationclick", (e) => {
