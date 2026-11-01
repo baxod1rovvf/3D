@@ -30,7 +30,7 @@ const track = (p, errors) => { p.on("pageerror", (e) => errors.push("pageerror: 
   assert.ok(scope.endsWith("/"), "scope " + scope);
   await page.evaluate(() => navigator.serviceWorker.ready);
   const caches1 = await page.evaluate(async () => caches.keys());
-  assert.ok(caches1.includes("oila-v2"), "cache oila-v2 missing: " + caches1);
+  assert.ok(caches1.includes("oila-v3"), "cache oila-v3 missing: " + caches1);
 
   // Manifest icons.
   const manifestHref = await page.evaluate(() => document.querySelector('link[rel="manifest"]').href);
@@ -73,9 +73,10 @@ const track = (p, errors) => { p.on("pageerror", (e) => errors.push("pageerror: 
   await sa.goto(BASE + "/kirish.html");
   assert.strictEqual(await sa.evaluate(() => App.installState()), "installed");
 
-  // Network passthrough: the SW must not cache supabase or non-GET (checked via cache contents).
-  const keys = await page.evaluate(async () => (await (await caches.open("oila-v2")).keys()).map((r) => r.url));
-  assert.ok(keys.length > 0 && keys.every((u) => !/supabase\.co/.test(u) && !/unpkg|googleapis/.test(u)), "bad cache entries: " + keys);
+  // Network passthrough: the SW never caches supabase data; pinned CDN files (Lucide, fonts) are cached on purpose.
+  const keys = await page.evaluate(async () => (await (await caches.open("oila-v3")).keys()).map((r) => r.url));
+  assert.ok(keys.length > 0 && keys.every((u) => !/supabase\.co/.test(u)), "bad cache entries: " + keys);
+  assert.ok(keys.some((u) => /unpkg\.com\/lucide@0\.454\.0/.test(u)), "pinned Lucide is cached for instant page switches");
 
   // Offline: a visited page still opens from cache.
   await page.goto(BASE + "/kirish.html");

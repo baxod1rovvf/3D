@@ -1,8 +1,8 @@
 /* Oila Uchun service worker: offline app shell, plus Web Push display. All URLs are relative to the SW scope. */
-const CACHE = "oila-v2";
+const CACHE = "oila-v3";
 const SHELL = [
   "./", "index.html", "rozgor.html", "taomlar.html", "xotiralar.html", "uy-ishlari.html", "kirish.html",
-  "css/app.css", "js/stickers.js", "js/messages.js", "js/reminders.js", "js/store.js", "js/app.js",
+  "css/app.css", "js/stickers.js", "js/catalog.js", "js/messages.js", "js/reminders.js", "js/store.js", "js/app.js",
   "assets/icon.svg", "assets/icon-192.png", "assets/icon-512.png", "manifest.webmanifest",
 ];
 
@@ -14,28 +14,32 @@ self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
+// Pinned third-party files (Lucide, supabase-js, Google Fonts): versioned URLs, so cache-first forever.
+const CDN = /^https:\/\/(unpkg\.com|cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com)\//;
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // supabase, CDNs, fonts: straight to network
+  if (CDN.test(req.url)) {
+    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      if (res && (res.ok || res.type === "opaque")) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+      return res;
+    })));
+    return;
+  }
+  if (url.origin !== self.location.origin) return; // supabase: straight to network
   if (url.pathname.endsWith("/js/config.js")) return; // deployment config: never cached
 
-  const put = (res) => {
-    if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
-    return res;
-  };
-  if (req.mode === "navigate") { // network-first so updates arrive; cache when offline
-    e.respondWith(fetch(req).then(put).catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match("index.html"))));
-    return;
-  }
-  if (/\/(js|css)\/[^/]+$/.test(url.pathname)) { // code and styles: network-first too, so a deploy shows up at once
-    e.respondWith(fetch(req).then(put).catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || Response.error())));
-    return;
-  }
-  // Cache-first, refreshed in the background for the next visit.
-  e.respondWith(caches.match(req).then((hit) => {
-    const net = fetch(req).then(put).catch(() => hit);
+  // Pages, code and styles: answer instantly from the cache and refresh it in the background, so
+  // switching sections doesn't wait for the network. A new deploy shows up on the next open.
+  const key = req.mode === "navigate" ? new Request(url.origin + url.pathname) : req;
+  e.respondWith(caches.match(key, { ignoreSearch: req.mode === "navigate" }).then((hit) => {
+    const net = fetch(req).then((res) => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(key, copy)); }
+      return res;
+    }).catch(() => hit || (req.mode === "navigate" ? caches.match("index.html") : Response.error()));
+    e.waitUntil(net.then(() => {}, () => {}));
     return hit || net;
   }));
 });

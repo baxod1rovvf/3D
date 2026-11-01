@@ -15,6 +15,7 @@
 <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/stickers.js"></script>
+<script src="js/catalog.js"></script>
 <script src="js/messages.js"></script>
 <script src="js/reminders.js"></script>
 <script src="js/store.js"></script>
@@ -68,6 +69,19 @@
     .sticker-preview.pop { animation: wiggle-pop 420ms var(--bounce); }
   }
   @keyframes wiggle-pop { 0% { transform: scale(.6) rotate(-12deg); } 60% { transform: scale(1.15) rotate(6deg); } 100% { transform: none; } }
+  .gifts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+  .gift { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 10px; background: var(--surface); border: 2px solid var(--line); border-radius: 20px; text-align: center; }
+  .gift .ge { font-size: 38px; line-height: 1.1; }
+  .gift .gn { font-weight: 700; font-size: 14px; }
+  .gift button { width: 100%; min-height: 44px; border: 0; border-radius: 14px; background: var(--accent-fill); color: var(--on-accent); font-weight: 800; font-size: 15px; }
+  .gift button:disabled { background: var(--accent-soft); color: var(--accent-ink); }
+  .gift-intro { margin: 14px 2px 0; color: var(--ink-2); font-size: 14px; }
+  .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cat-chips button, .pick-chips button { border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 12px; min-height: 44px; font-weight: 700; font-size: 14px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+  .cat-chips button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-soft); }
+  .pick-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pick-chips button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-fill); color: var(--on-accent); }
+  .pick-chips button:disabled { opacity: .55; }
   .search { position: relative; margin-top: 12px; }
   .search > svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
   .search .input { padding-left: 42px; padding-right: 48px; }
@@ -82,7 +96,8 @@
     <div class="segmented" role="tablist" aria-label="Ro'yxat ko'rinishi">
       <button role="tab" data-view="all">Hammasi</button>
       <button role="tab" data-view="need">Kerak <span class="count" id="c-need">0</span></button>
-      <button role="tab" data-view="bought">Xarid qilindi <span class="count" id="c-bought">0</span></button>
+      <button role="tab" data-view="bought">Olindi <span class="count" id="c-bought">0</span></button>
+      <button role="tab" data-view="gift" aria-label="Xohishlar">🎁</button>
     </div>
     <div class="search" role="search">
       <i data-lucide="search" aria-hidden="true"></i>
@@ -96,18 +111,10 @@
 
 <script>
 const { $, $$, esc, icons } = App;
-const CATS = [
-  { id: "sabzavot", name: "Sabzavotlar" },
-  { id: "meva", name: "Mevalar" },
-  { id: "sut", name: "Sut mahsulotlari" },
-  { id: "gosht", name: "Go'sht mahsulotlari" },
-  { id: "non", name: "Non va un mahsulotlari" },
-  { id: "ichimlik", name: "Ichimliklar" },
-  { id: "uy", name: "Uy-ro'zg'or buyumlari" },
-  { id: "boshqa", name: "Boshqalar" },
-].map((c) => ({ ...c, emoji: Stickers.forName("", c.id) }));
+const CATS = Catalog.CATEGORIES;
 const catOf = (id) => CATS.find((c) => c.id === id) || CATS[CATS.length - 1];
-const stickerOf = (i) => Stickers.forName(i.name, catOf(i.category).id);
+const emojiFor = (name, cat) => (Catalog.find(name) || {}).emoji || Stickers.forName(name, cat);
+const stickerOf = (i) => emojiFor(i.name, catOf(i.category).id);
 const sticker = (i) => `<span class="sticker" aria-hidden="true">${stickerOf(i)}</span>`;
 // The row just added wobbles in once. Realtime re-renders replace #list within the animation's
 // 620ms, so keep the start time and resume each redraw where it left off (negative delay).
@@ -120,6 +127,7 @@ let loaded = false;
 
 function setView(v) {
   view = v;
+  $(".search").hidden = v === "gift";
   $$(".segmented button").forEach((b) => { const on = b.dataset.view === v; b.classList.toggle("active", on); b.setAttribute("aria-selected", on); });
   draw();
 }
@@ -186,6 +194,7 @@ function draw() {
   $("#c-need").textContent = need.length;
   $("#c-bought").textContent = bought.length;
   let html = "";
+  if (view === "gift") { drawGifts(); return; }
   if (query) {
     const hits = (view === "need" ? need : view === "bought" ? bought : items).filter(matches);
     const rowFn = view === "need" ? rowNeed : view === "bought" ? rowBought : rowAll;
@@ -194,7 +203,7 @@ function draw() {
       : `<div class="empty" style="margin-top:30px"><div class="ico emo" aria-hidden="true">🔍</div><strong>«${esc(raw)}» topilmadi</strong><p>Bu ro'yxatda bunday mahsulot yo'q.</p>
          <button class="btn primary" id="add-found"><i data-lucide="plus"></i>«${esc(raw)}» ni qo'shish</button></div>`;
     const add = $("#add-found");
-    if (add) add.addEventListener("click", () => { openEditor(); setTimeout(() => { const n = $("#g-name"); if (n) { n.value = raw; n.dispatchEvent(new Event("input")); } }, 50); });
+    if (add) add.addEventListener("click", () => { openEditor(); setTimeout(() => { const n = $("#a-own"); if (n) { n.value = raw; n.dispatchEvent(new Event("input")); } }, 50); });
     icons();
     return;
   }
@@ -272,7 +281,98 @@ async function restockAll() {
   render();
 }
 
+/* ---------- 🎁 Xohishlar: ask the partner to bring a treat ---------- */
+function drawGifts() {
+  const partner = Store.ctx && Store.ctx.partner;
+  const dear = Store.ctx && Store.ctx.profile.role === "er" ? "Oyijonisiga" : "Dadajonisiga";
+  $("#list").innerHTML = `<p class="gift-intro">Nima yegingiz kelyapti? «Хочу» ni bosing — ${esc(partner ? App.firstName(partner) : dear)} darrov xabar boradi 💌</p>
+    <div class="gifts">${Catalog.GIFTS.map((g, i) => `<div class="gift"><span class="ge emo" aria-hidden="true">${g.emoji}</span><span class="gn">${esc(g.name)}</span>
+      <button data-gift="${i}" aria-label="${esc(g.name)}: хочу">Хочу 🥺</button></div>`).join("")}</div>`;
+}
+$("#list").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-gift]"); if (!b) return;
+  const g = Catalog.GIFTS[+b.dataset.gift];
+  if (!Store.ctx.partner) return App.toast("Avval juftingiz telefonini ulang: ⚙ → Qurilmani ulash", "smartphone");
+  b.disabled = true; b.textContent = "Yuborildi 💌";
+  if (navigator.vibrate) navigator.vibrate([15, 40, 15]);
+  try {
+    await Store.notify("gift_wish", { gift: g.name, verb: g.verb }, "rozgor.html?view=gift");
+    App.toast(`${g.emoji} ${App.firstName(Store.ctx.partner)}ga yuborildi!`, "heart");
+  } catch (err) { App.fail(err); }
+  setTimeout(() => { b.disabled = false; b.textContent = "Хочу 🥺"; }, 4000);
+});
+
+/* ---------- Add products: pick a category, tick several products, or type your own ---------- */
+function openAdder() {
+  let cat = CATS[0].id;
+  const picked = new Set();
+  const norm = (n) => Stickers.normalize(n);
+  const stateOf = (name) => { const it = items.find((i) => norm(i.name) === norm(name)); return it ? it.status : null; };
+  App.sheet({
+    title: "Bugun nima kerak? 🛍️",
+    body: `<div class="field"><span class="label">Turkum</span><div class="cat-chips" id="a-cats" role="group" aria-label="Turkum"></div></div>
+      <div class="field"><span class="label">Mahsulotlarni tanlang <span class="hint">(bir nechtasini)</span></span><div class="pick-chips" id="a-picks" role="group" aria-label="Mahsulotlar"></div></div>
+      <div class="field"><label for="a-own">Boshqa mahsulot</label>
+        <div class="name-row"><span class="sticker lg sticker-preview" id="a-sticker" aria-hidden="true">${CATS[0].emoji}</span><input class="input" id="a-own" autocomplete="off" maxlength="60" placeholder="ro'yxatda yo'q bo'lsa, yozing"></div></div>`,
+    foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn primary" data-save disabled>Qo'shish</button>`,
+    onMount(el, api) {
+      const own = $("#a-own", el), save = $("[data-save]", el);
+      const count = () => picked.size + (own.value.trim() ? 1 : 0);
+      const refresh = () => { const n = count(); save.disabled = !n; save.innerHTML = n ? `Qo'shish (${n}) <span class="emo" aria-hidden="true">✨</span>` : "Qo'shish"; };
+      const drawCats = () => {
+        $("#a-cats", el).innerHTML = CATS.map((c) => `<button type="button" data-cat="${c.id}" aria-pressed="${c.id === cat}"><span class="emo" aria-hidden="true">${c.emoji}</span>${esc(c.name)}</button>`).join("");
+      };
+      const drawPicks = () => {
+        $("#a-picks", el).innerHTML = Catalog.category(cat).products.map((x) => {
+          const st = stateOf(x.name), on = picked.has(x.name);
+          return `<button type="button" data-pick="${esc(x.name)}" aria-pressed="${on}" ${st === "kerak" ? "disabled" : ""}><span class="emo" aria-hidden="true">${x.emoji}</span>${esc(x.name)}${st === "kerak" ? " ✓" : ""}</button>`;
+        }).join("");
+      };
+      drawCats(); drawPicks();
+      $("#a-cats", el).addEventListener("click", (e) => { const b = e.target.closest("[data-cat]"); if (!b) return; cat = b.dataset.cat; drawCats(); drawPicks(); $("#a-sticker", el).textContent = emojiFor(own.value, cat); });
+      $("#a-picks", el).addEventListener("click", (e) => {
+        const b = e.target.closest("[data-pick]"); if (!b || b.disabled) return;
+        const n = b.dataset.pick;
+        picked.has(n) ? picked.delete(n) : picked.add(n);
+        b.setAttribute("aria-pressed", picked.has(n)); refresh();
+      });
+      own.addEventListener("input", () => {
+        const prev = $("#a-sticker", el), e2 = emojiFor(own.value, cat);
+        if (prev.textContent !== e2) { prev.textContent = e2; prev.classList.remove("pop"); void prev.offsetWidth; prev.classList.add("pop"); }
+        refresh();
+      });
+      own.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if (count()) save.click(); } });
+      save.addEventListener("click", async () => {
+        const names = [...picked];
+        const typed = own.value.trim();
+        if (typed && !names.some((n) => norm(n) === norm(typed))) names.push(typed);
+        if (!names.length) return;
+        save.disabled = true;
+        const me = Store.ctx.profile.id, now = new Date().toISOString();
+        let added = 0;
+        try {
+          for (const name of names) {
+            const found = items.find((i) => norm(i.name) === norm(name));
+            if (found && found.status === "kerak") continue;
+            const category = (Catalog.find(name) || {}).category || cat;
+            if (found) await Store.update("grocery_items", found.id, { status: "kerak", marked_by: me, marked_at: now, purchased_by: null, purchased_at: null });
+            else {
+              const row = await Store.insert("grocery_items", { name, category, quantity: "", note: "", urgent: false, status: "kerak", added_by: me, marked_by: me, marked_at: now });
+              if (row && row.id) fresh = { id: row.id, t0: null };
+            }
+            App.queueGrocery("grocery_need", name);
+            added++;
+          }
+          App.toast(added ? `${added} ta mahsulot «Kerak» ro'yxatiga qo'shildi 🛒` : "Bular allaqachon ro'yxatda ✓", "shopping-basket");
+          api.close(); render();
+        } catch (err) { App.fail(err); save.disabled = false; }
+      });
+    },
+  });
+}
+
 function openEditor(item) {
+  if (!item) return openAdder();
   const isNew = !item;
   const it = item || { name: "", category: "sabzavot", quantity: "", note: "", urgent: false, status: "kerak" };
   App.sheet({

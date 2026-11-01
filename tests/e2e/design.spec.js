@@ -75,16 +75,14 @@ const PAGES = [
   const stickerBox = await page.locator(".g-row .sticker").first().boundingBox();
   assert.ok(Math.round(stickerBox.width) === 44 && Math.round(stickerBox.height) === 44, "sticker is 44px: " + JSON.stringify(stickerBox));
 
-  // Add sheet: live sticker preview while typing.
+  // Add sheet: category chips, multi-select products, live sticker preview for a typed product.
   await page.click("#add");
-  await page.waitForSelector(".sheet.open #g-name");
-  await page.fill("#g-name", "olma");
+  await page.waitForSelector(".sheet.open #a-own");
+  await page.fill("#a-own", "olma");
   await page.waitForFunction(() => (document.querySelector(".sheet .sticker-preview") || {}).textContent === "🍎");
-  await page.fill("#g-name", "");
-  await page.selectOption("#g-cat", "sut");
-  await page.waitForFunction(() => (document.querySelector(".sheet .sticker-preview") || {}).textContent === "🧀");
-  await page.fill("#g-name", "Sabzi");
-  await page.waitForTimeout(350);
+  await page.fill("#a-own", "");
+  await page.click('.sheet [data-cat="gigiyena"]');
+  await page.waitForSelector('.sheet [data-pick="Bolalar tagligi (pampers)"]');
   await page.screenshot({ path: `${SHOTS}/design-add-sheet.png` });
   const sheetOverflow = await page.evaluate(() => { const b = document.querySelector(".sheet-body"); return b.scrollWidth - b.clientWidth; });
   assert.ok(sheetOverflow <= 0, "sheet horizontal overflow " + sheetOverflow);
@@ -94,9 +92,9 @@ const PAGES = [
   // New row wobbles in, and keeps animating through the debounced realtime re-render (~120ms).
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.click("#add");
-  await page.waitForSelector(".sheet.open #g-name");
-  await page.fill("#g-name", "Qulupnay");
-  await page.selectOption("#g-cat", "meva");
+  await page.waitForSelector(".sheet.open #a-own");
+  await page.click('.sheet [data-cat="meva"]');
+  await page.click('.sheet [data-pick="Qulupnay"]');
   await page.click(".sheet [data-save]");
   await page.waitForTimeout(300);
   // A redraw re-creates the CSS animation, so its currentTime alone restarts at 0. The effective

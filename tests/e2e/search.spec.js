@@ -29,7 +29,7 @@ const LUCIDE = process.env.LUCIDE_PATH || "/tmp/claude-0/-home-user-3D/600534e3-
   await p.fill("#q", "ananas");
   assert.ok(await p.isVisible("#add-found"), "nothing found → offer to add it");
   await p.click("#add-found"); await p.waitForTimeout(400);
-  assert.equal(await p.inputValue("#g-name"), "ananas");
+  assert.equal(await p.inputValue("#a-own"), "ananas");
   await p.keyboard.press("Escape"); await p.waitForTimeout(300);
   await p.click("#q-clear");
   assert.ok((await names()).length > 10, "clearing shows everything again");

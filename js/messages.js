@@ -11,6 +11,7 @@
     memory_added: "📸 Xotira",
     meal_reminder: "🍳 Taom vaqti",
     test: "🔔 Sinov",
+    gift_wish: "🎁 Xohish",
   };
 
   // Last vibration value per type group; the rest of the pattern is shared.
@@ -100,6 +101,12 @@
         return (SLOT[d.slot] ? SLOT[d.slot].dat : "Taomga") + " " + (d.hours == null ? "bir necha" : d.hours) + " soat qoldi" +
           (d.meal ? " — menyuda «" + meal + "»" : " — hali reja yo'q, nima pishiramiz? 🤔");
       case "test": return "Bildirishnomalar ishlayapti! 🎉";
+      case "gift_wish": {
+        // A sweet request in the family's own words: "Dadajonisi, rosa banan yegim kelyapdi…"
+        const dear = d.actorRole === "er" ? "Oyijonisi" : "Dadajonisi";
+        const want = d.verb === "ich" ? "ichgim" : "yegim";
+        return dear + ", rosa " + String(d.gift || "shirinlik").toLowerCase() + " " + want + " kelyapdi. Qaytishizda olib keliiing 🥺";
+      }
       default: throw new Error("Unknown message type: " + type);
     }
   }
@@ -120,6 +127,7 @@
       case "task_added": return who + " yangi ish qo'shdi: «" + task + "»";
       case "meal_added": return who + " menyuga «" + meal + "» qo'shdi" + mealWhen(d);
       case "memory_added": return who + " yangi xotira qo'shdi: «" + memory + "»";
+      case "gift_wish": return who + " " + String(d.gift || "shirinlik").toLowerCase() + " so'radi 🎁";
       case "meal_reminder": case "test": return null;
       default: throw new Error("Unknown activity type: " + type);
     }
@@ -130,7 +138,7 @@
     const r = rand || Math.random;
     const fixed = fixedFor(type, d);
     let body = fixed;
-    if (type !== "meal_reminder" && type !== "test") {
+    if (type !== "meal_reminder" && type !== "test" && type !== "gift_wish") {
       const byRole = ENDINGS[type];
       const list = byRole[d.actorRole] || byRole.er;
       body = fixed + " — " + list[Math.floor(r() * list.length)];

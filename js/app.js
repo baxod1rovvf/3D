@@ -620,6 +620,17 @@
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch((e) => console.warn("sw", e)));
   }
 
+  // Chrome on Android starts rendering a section as soon as its tab is touched, so the switch
+  // feels instant even though every section is its own page.
+  try {
+    if (HTMLScriptElement.supports && HTMLScriptElement.supports("speculationrules")) {
+      const s = document.createElement("script");
+      s.type = "speculationrules";
+      s.textContent = JSON.stringify({ prerender: [{ source: "list", urls: TABS.map((t) => t.href), eagerness: "moderate" }] });
+      document.head.appendChild(s);
+    }
+  } catch (e) {}
+
   window.App = {
     queueGrocery, unqueueGrocery, flushGroceries,
     installState, install,

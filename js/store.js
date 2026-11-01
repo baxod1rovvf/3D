@@ -484,13 +484,72 @@
     };
   }
 
-  const moduleOf = (type) => (type === "test" ? "test" : type.startsWith("grocery") ? "grocery" : type.startsWith("task") ? "tasks" : type.startsWith("meal") ? "meals" : "memories");
+  const moduleOf = (type) => (type === "test" ? "test" : type.startsWith("grocery") || type === "gift_wish" ? "grocery" : type.startsWith("task") ? "tasks" : type.startsWith("meal") ? "meals" : "memories");
 
   const backend = cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY ? supabaseBackend() : cfg.API_URL ? apiBackend() : demoBackend();
 
   /* ------------------------------------------------------------------ */
   /* Shared helpers on top of the backend                                */
   /* ------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------ */
+  /* Instant pages: stale-while-revalidate cache for reads               */
+  /* ------------------------------------------------------------------ */
+  // Every section is its own HTML page, so each switch used to wait for the database before
+  // drawing. Reads now come from the last copy saved on this phone and are refreshed in the
+  // background; if the fresh copy differs, subscribers get a change event and redraw. Writes
+  // and incoming realtime events drop the cached table first, so nothing stale sticks.
+  if (backend.mode !== "demo") (function cacheReads() {
+    const PREFIX = "oila-cache:";
+    const cacheKey = (name) => PREFIX + (Device.key() || "") + ":" + name + "@" + (Device.me() || "");
+    const get = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+    const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* full: just skip caching */ } };
+    const drop = (table) => {
+      try {
+        const pre = PREFIX + (Device.key() || "") + ":" + (table === "*" ? "" : "list:" + table + ":");
+        Object.keys(localStorage).filter((k) => k.startsWith(pre)).forEach((k) => localStorage.removeItem(k));
+      } catch (e) {}
+    };
+    const changed = new Set(); // subscriber callbacks, told when a background refresh brings news
+
+    const family = backend.family.bind(backend);
+    backend.family = async (k) => {
+      const ck = PREFIX + (k || Device.key() || "") + ":family";
+      const hit = get(ck);
+      const fresh = family(k).then((v) => { if (v) put(ck, v); else localStorage.removeItem(ck); return v; });
+      if (hit) { fresh.catch(() => {}); return hit; }
+      return fresh;
+    };
+
+    const list = backend.list.bind(backend);
+    backend.list = async (table, opts = {}) => {
+      const ck = cacheKey("list:" + table + ":" + JSON.stringify(opts));
+      const hit = get(ck);
+      const fresh = list(table, opts).then((rows) => {
+        const before = JSON.stringify(get(ck));
+        put(ck, rows);
+        if (hit && before !== JSON.stringify(rows)) changed.forEach((cb) => cb(table, { eventType: "UPDATE", new: {} }));
+        return rows;
+      });
+      if (hit) { fresh.catch(() => {}); return hit; }
+      return fresh;
+    };
+
+    for (const name of ["insert", "insertMany", "update", "updateWhere", "remove"]) {
+      const fn = backend[name].bind(backend);
+      backend[name] = async (table, ...args) => { drop(table); try { return await fn(table, ...args); } finally { drop(table); } };
+    }
+
+    const subscribe = backend.subscribe.bind(backend);
+    backend.subscribe = (tables, cb) => {
+      const wrapped = (t, p) => { drop(t); cb(t, p); };
+      const refresh = (t, p) => { if (t === "*" || tables.includes(t)) cb(t, p); };
+      changed.add(refresh);
+      const off = subscribe(tables, wrapped);
+      return () => { changed.delete(refresh); if (off) off(); };
+    };
+    backend.dropCache = () => drop("*");
+  })();
+
   const Store = Object.assign(backend, {
     TABLES,
     ctx: null,
@@ -519,7 +578,8 @@
       return `${base}kirish.html#k=${Device.key()}`;
     },
     /** Disconnect this phone (the family's data stays). */
-    forgetDevice() { Device.del("oila-family-key"); Device.del("oila-me"); },
+    forgetDevice() {
+      if (backend.dropCache) backend.dropCache(); Device.del("oila-family-key"); Device.del("oila-me"); },
 
     /**
      * Record a third-person entry in the shared activity feed, and send a typed, playful notification
