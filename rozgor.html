@@ -69,13 +69,36 @@
     .sticker-preview.pop { animation: wiggle-pop 420ms var(--bounce); }
   }
   @keyframes wiggle-pop { 0% { transform: scale(.6) rotate(-12deg); } 60% { transform: scale(1.15) rotate(6deg); } 100% { transform: none; } }
+  /* ---------- 🎁 Xohishlar: candy-shop look ---------- */
+  .gift-hero { position: relative; overflow: hidden; margin-top: 14px; padding: 18px 16px 16px; border-radius: 24px; color: #3B1530;
+    background: linear-gradient(135deg, #FFD6E8 0%, #FFE7C2 55%, #E4DCFF 100%); box-shadow: 0 4px 0 #F2B6CF; }
+  .gift-hero h3 { margin: 0; font-family: var(--display); font-size: 22px; line-height: 1.2; }
+  .gift-hero p { margin: 6px 0 0; font-size: 14px; font-weight: 600; max-width: 80%; }
+  .gift-hero .floaty { position: absolute; font-size: 26px; opacity: .9; pointer-events: none; }
+  .gift-hero .f1 { right: 14px; top: 10px; } .gift-hero .f2 { right: 54px; bottom: 8px; font-size: 22px; } .gift-hero .f3 { right: 10px; bottom: 12px; font-size: 30px; }
+  .gift-sent { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.7); font-size: 12.5px; font-weight: 800; }
   .gifts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
-  .gift { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 10px; background: var(--surface); border: 2px solid var(--line); border-radius: 20px; text-align: center; }
-  .gift .ge { font-size: 38px; line-height: 1.1; }
-  .gift .gn { font-weight: 700; font-size: 14px; }
-  .gift button { width: 100%; min-height: 44px; border: 0; border-radius: 14px; background: var(--accent-fill); color: var(--on-accent); font-weight: 800; font-size: 15px; }
-  .gift button:disabled { background: var(--accent-soft); color: var(--accent-ink); }
-  .gift-intro { margin: 14px 2px 0; color: var(--ink-2); font-size: 14px; }
+  .gift { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px 8px; border-radius: 22px; text-align: center;
+    background: var(--g-bg); border: 2px solid var(--g-line); box-shadow: 0 3px 0 var(--g-line); transition: transform .15s; }
+  .gift:nth-child(6n+1) { --g-bg: #FFE3EE; --g-line: #F7BCD2; } .gift:nth-child(6n+2) { --g-bg: #FFF1CC; --g-line: #F4D98B; }
+  .gift:nth-child(6n+3) { --g-bg: #E0F5E9; --g-line: #A9DFC0; } .gift:nth-child(6n+4) { --g-bg: #E6E3FF; --g-line: #C3BCFA; }
+  .gift:nth-child(6n+5) { --g-bg: #FFE6D8; --g-line: #F8C2A3; } .gift:nth-child(6n+6) { --g-bg: #DFF1FF; --g-line: #A9D4F5; }
+  .gift .ge { font-size: 42px; line-height: 1.1; display: inline-block; }
+  .gift .gn { font-weight: 800; font-size: 14px; color: #2B2440; }
+  .gift button { width: 100%; min-height: 44px; margin-top: 4px; border: 0; border-radius: 16px; background: #FF5C8A; color: #fff; font-weight: 800; font-size: 15px; box-shadow: 0 3px 0 #D93A6A; }
+  .gift button:active { transform: translateY(2px); box-shadow: 0 1px 0 #D93A6A; }
+  .gift button:disabled { background: #fff; color: #C2185B; box-shadow: none; font-size: 13px; white-space: nowrap; }
+  .gift.sent { transform: scale(1.04) rotate(-2deg); }
+  .heart-fly { position: absolute; left: 50%; top: 30%; font-size: 20px; pointer-events: none; z-index: 2; }
+  @media (prefers-reduced-motion: no-preference) {
+    .gift .ge { animation: bob 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+    .gift-hero .floaty { animation: bob 3s ease-in-out infinite; } .gift-hero .f2 { animation-delay: -1s; } .gift-hero .f3 { animation-delay: -2s; }
+    .gift.sent .ge { animation: wish-jump .6s cubic-bezier(.3,1.6,.5,1); }
+    .heart-fly { animation: heart-up 1s ease-out forwards; }
+  }
+  @keyframes bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
+  @keyframes wish-jump { 0% { transform: scale(1); } 40% { transform: scale(1.45) translateY(-10px) rotate(-10deg); } 100% { transform: scale(1); } }
+  @keyframes heart-up { from { opacity: 1; transform: translate(-50%, 0) scale(.6); } to { opacity: 0; transform: translate(calc(-50% + var(--x)), -90px) scale(1.2) rotate(var(--r)); } }
   /* Categories: a compact tab strip (emoji over a short label) on a tinted rail. */
   .cat-strip { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 6px 16px; background: var(--accent-soft); border-radius: 0; }
   .cat-strip::-webkit-scrollbar { display: none; }
@@ -137,6 +160,7 @@ let loaded = false;
 function setView(v) {
   view = v;
   $(".search").hidden = v === "gift";
+  $("#add").hidden = v === "gift"; // the ➕ isn't for wishes, and it would cover a «Хочу»
   $$(".segmented button").forEach((b) => { const on = b.dataset.view === v; b.classList.toggle("active", on); b.setAttribute("aria-selected", on); });
   draw();
 }
@@ -291,24 +315,47 @@ async function restockAll() {
 }
 
 /* ---------- 🎁 Xohishlar: ask the partner to bring a treat ---------- */
+const WISH_KEY = () => "oila-wishes-" + App.today();
+const wishesToday = () => { try { return +localStorage.getItem(WISH_KEY()) || 0; } catch (e) { return 0; } };
 function drawGifts() {
   const partner = Store.ctx && Store.ctx.partner;
-  const dear = Store.ctx && Store.ctx.profile.role === "er" ? "Oyijonisiga" : "Dadajonisiga";
-  $("#list").innerHTML = `<p class="gift-intro">Nima yegingiz kelyapti? «Хочу» ni bosing — ${esc(partner ? App.firstName(partner) : dear)} darrov xabar boradi 💌</p>
-    <div class="gifts">${Catalog.GIFTS.map((g, i) => `<div class="gift"><span class="ge emo" aria-hidden="true">${g.emoji}</span><span class="gn">${esc(g.name)}</span>
+  const dear = Store.ctx && Store.ctx.profile.role === "er" ? "Oyijonisi" : "Dadajonisi";
+  const who = partner ? App.firstName(partner) : dear;
+  const n = wishesToday();
+  $("#list").innerHTML = `<div class="gift-hero">
+      <span class="floaty f1 emo" aria-hidden="true">🍭</span><span class="floaty f2 emo" aria-hidden="true">🍫</span><span class="floaty f3 emo" aria-hidden="true">💝</span>
+      <h3>Nimadir shirin yegingiz kelyaptimi? 🥺</h3>
+      <p>«Хочу» ni bosing — ${esc(who)} qaytishda olib keladi 💌</p>
+      ${n ? `<span class="gift-sent" id="wish-count">Bugun ${n} ta xohish yuborildi 💕</span>` : `<span class="gift-sent" id="wish-count" hidden></span>`}
+    </div>
+    <div class="gifts">${Catalog.GIFTS.map((g, i) => `<div class="gift" style="--d:${(-i * 0.37).toFixed(2)}s"><span class="ge emo" aria-hidden="true">${g.emoji}</span><span class="gn">${esc(g.name)}</span>
       <button data-gift="${i}" aria-label="${esc(g.name)}: хочу">Хочу 🥺</button></div>`).join("")}</div>`;
+}
+function heartBurst(card) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  ["💖", "💕", "💗", "✨", "💝"].forEach((h, k) => {
+    const el = document.createElement("span");
+    el.className = "heart-fly emo"; el.textContent = h;
+    el.style.setProperty("--x", `${(k - 2) * 22}px`); el.style.setProperty("--r", `${(k - 2) * 15}deg`);
+    el.style.animationDelay = `${k * 60}ms`;
+    card.appendChild(el); setTimeout(() => el.remove(), 1400);
+  });
 }
 $("#list").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-gift]"); if (!b) return;
   const g = Catalog.GIFTS[+b.dataset.gift];
   if (!Store.ctx.partner) return App.toast("Avval juftingiz telefonini ulang: ⚙ → Qurilmani ulash", "smartphone");
+  const card = b.closest(".gift");
   b.disabled = true; b.textContent = "Yuborildi 💌";
-  if (navigator.vibrate) navigator.vibrate([15, 40, 15]);
+  card.classList.add("sent"); heartBurst(card);
+  if (navigator.vibrate) navigator.vibrate([15, 40, 15, 40, 30]);
   try {
     await Store.notify("gift_wish", { gift: g.name, verb: g.verb }, "rozgor.html?view=gift");
-    App.toast(`${g.emoji} ${App.firstName(Store.ctx.partner)}ga yuborildi!`, "heart");
+    try { localStorage.setItem(WISH_KEY(), wishesToday() + 1); } catch (err) {}
+    const c = $("#wish-count"); if (c) { c.hidden = false; c.textContent = `Bugun ${wishesToday()} ta xohish yuborildi 💕`; }
+    App.toast(`${g.emoji} ${App.firstName(Store.ctx.partner)}ga yuborildi! Endi kutamiz 🥰`, "heart");
   } catch (err) { App.fail(err); }
-  setTimeout(() => { b.disabled = false; b.textContent = "Хочу 🥺"; }, 4000);
+  setTimeout(() => { b.disabled = false; b.textContent = "Хочу 🥺"; card.classList.remove("sent"); }, 4000);
 });
 
 /* ---------- Add products: name box on top (emoji on the left); a one-line category strip;
