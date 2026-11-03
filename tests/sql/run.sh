@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs supabase/schema.sql (twice) and tests/sql/push.sql against a fresh local PostgreSQL 16 database.
+# Runs supabase/schema.sql (twice), tests/sql/push.sql and tests/sql/reset.sql against a fresh local PostgreSQL 16 database.
 # Env: PGHOST (default /tmp/oila-pgtest), PGPORT (5499), PGUSER (postgres), DB (oila_t8).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -19,4 +19,5 @@ end \$\$;"
 "${PSQL[@]}" -d "$DB" -f supabase/schema.sql
 "${PSQL[@]}" -d "$DB" -f supabase/schema.sql
 "${PSQL[@]}" -d "$DB" -f tests/sql/push.sql > /dev/null
+"${PSQL[@]}" -d "$DB" -f tests/sql/reset.sql > /dev/null
 echo PASS

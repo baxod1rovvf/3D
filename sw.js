@@ -1,5 +1,5 @@
 /* Oila Uchun service worker: offline app shell, plus Web Push display. All URLs are relative to the SW scope. */
-const CACHE = "oila-v4";
+const CACHE = "oila-v5";
 const SHELL = [
   "./", "index.html", "rozgor.html", "taomlar.html", "xotiralar.html", "uy-ishlari.html", "kirish.html",
   "css/app.css", "js/stickers.js", "js/catalog.js", "js/messages.js", "js/reminders.js", "js/store.js", "js/app.js",

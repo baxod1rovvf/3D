@@ -112,6 +112,19 @@ async function route(request, db) {
     return json({ household, members: results.map(rowOut) });
   }
 
+  // "Orqaga" in Settings: delete the whole family and everything it saved. The other phone's next
+  // poll gets 404 (family not found) and goes back to the welcome screen.
+  if (parts[0] === "family" && method === "DELETE") {
+    await db.batch([
+      db.prepare(`DELETE FROM records WHERE household_id = ?`).bind(key),
+      db.prepare(`DELETE FROM photos WHERE household_id = ?`).bind(key),
+      db.prepare(`DELETE FROM pair_codes WHERE household_id = ?`).bind(key),
+      db.prepare(`DELETE FROM versions WHERE household_id = ?`).bind(key),
+      db.prepare(`DELETE FROM households WHERE key = ?`).bind(key),
+    ]);
+    return json({ deleted: true });
+  }
+
   // Change counters, polled by the phones to stay in sync.
   if (parts[0] === "versions" && method === "GET") {
     const { results } = await db.prepare(`SELECT tbl, v FROM versions WHERE household_id = ?`).bind(key).all();

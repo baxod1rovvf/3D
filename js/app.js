@@ -137,13 +137,14 @@
     return api;
   }
 
-  function confirmSheet(text, verb = "O'chirish") {
+  /** Destructive confirm: Cancel has focus, Escape or the backdrop cancels. title names what goes. */
+  function confirmSheet(text, verb = "O'chirish", title = "Ishonchingiz komilmi?") {
     return new Promise((resolve) => {
       let ok = false;
       sheet({
-        title: "Ishonchingiz komilmi?",
+        title,
         body: `<p style="margin:4px 0 8px;color:var(--ink-2)">${esc(text)}</p>`,
-        foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn danger" data-ok>${esc(verb)}</button>`,
+        foot: `<button class="btn ghost" data-close autofocus>Bekor qilish</button><button class="btn danger" data-ok>${esc(verb)}</button>`,
         onMount(el, api) { $("[data-ok]", el).addEventListener("click", () => { ok = true; api.close(); }); },
         onClose() { resolve(ok); },
       });
@@ -453,6 +454,11 @@
             <button class="row" data-pair-show style="width:100%;border:0;background:none;text-align:left"><i data-lucide="smartphone"></i><div class="grow"><div class="title">Qurilmani ulash</div><div class="meta">Juftingiz telefoni uchun kod olish</div></div><i data-lucide="chevron-right"></i></button>
             <button class="row" data-pair-enter style="width:100%;border:0;background:none;text-align:left"><i data-lucide="keyboard"></i><div class="grow"><div class="title">Menda kod bor</div><div class="meta">Juftingiz bergan kodni kiritish</div></div><i data-lucide="chevron-right"></i></button>
           </div></div>
+        <div class="section" data-reset-section><div class="section-head"><h2>\uD83D\uDD04 Boshidan boshlash</h2></div>
+          <div class="card" style="padding:14px">
+            <p class="hint" style="margin:0 0 12px">Ro'zg'or, taomlar, xotiralar, uy ishlari, bildirishnomalar va sozlamalar ikkala telefondan ham butunlay o'chadi. Ilova birinchi kundagidek noldan boshlanadi.</p>
+            <button class="btn danger block" data-reset><i data-lucide="rotate-ccw"></i>Orqaga</button>
+          </div></div>
         ${demo ? `<p class="hint" style="margin-top:14px">Demo rejim: ma'lumotlar faqat shu brauzerda. Ikki telefon o'rtasida ulashish uchun js/config.js ga Supabase manzili va kalitini yozing.</p>` : ""}`,
       foot: `${c.partner ? `<button class="btn ghost" data-switch><i data-lucide="repeat"></i>Men ${esc(firstName(c.partner))}man</button>` : ""}<button class="btn danger" data-out><i data-lucide="unplug"></i>Uzish</button>`,
       onMount(el, api) {
@@ -516,6 +522,18 @@
           await withTimeout(disablePushQuietly());
           Store.forgetDevice(); location.href = "kirish.html";
         });
+        $("[data-reset]", el).addEventListener("click", async () => {
+          api.close();
+          const family = (Store.ctx.household && Store.ctx.household.name) || "Bizning uy";
+          if (!(await confirmSheet(
+            "Ro'zg'or, taomlar menyusi, xotiralar va rasmlar, uy ishlari, bildirishnomalar va sozlamalar ikkala telefondan ham o'chadi. Buni qaytarib bo'lmaydi.",
+            "Hammasini o'chirish", `«${family}» butunlay o'chirilsinmi?`))) return;
+          const hide = toast("Hammasi o'chirilmoqda\u2026", "loader");
+          try { await Store.startOver(); }
+          catch (e) { console.error(e); hide(); toast("O'chirib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.", "wifi-off"); return; }
+          await withTimeout(disablePushQuietly()); // the server row went with the family; this unsubscribes the browser
+          location.replace("kirish.html?reset=1");
+        });
         const sw = $("[data-switch]", el);
         if (sw) sw.addEventListener("click", async () => { Store.chooseMe(c.partner.id); await withTimeout(rebindPush(c.partner)); location.reload(); });
       },
@@ -545,6 +563,16 @@
   function setTheme(t) { try { localStorage.setItem(THEME_KEY, t); } catch (e) {} applyTheme(t); }
   applyTheme(); // runs in <head>, before the page paints
   if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme());
+
+  /* The partner pressed "Orqaga": the family no longer exists, so this phone starts over too. */
+  let familyGoneHandled = false;
+  window.addEventListener("oila:family-gone", () => {
+    if (familyGoneHandled) return;
+    familyGoneHandled = true;
+    Store.ctx = null; // no grocery batch is sent for a family that is gone
+    Store.forgetDevice();
+    location.replace("kirish.html?reset=1");
+  });
 
   /* ---------- task reminders (runs on every page) ---------- */
   async function checkReminders() {
