@@ -63,10 +63,14 @@ const { $, $$, esc, icons } = App;
 const view = $("#view");
 $("#logo").innerHTML = App.logoMark(76);
 const OFFLINE = "Ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.";
+// Arrived here from "Orqaga" (this phone or the partner's): say why the app is empty again.
+const wasReset = new URLSearchParams(location.search).has("reset");
+if (wasReset) history.replaceState(null, "", location.pathname + location.hash);
 
 /* ---------- First phone: set up the family ---------- */
 function setupView() {
-  view.innerHTML = `<form id="f" novalidate>
+  view.innerHTML = `${wasReset ? `<div class="card" data-reset-note style="padding:12px 14px;margin-bottom:16px;text-align:center"><b><span class="emo" aria-hidden="true">🧹</span> Hammasi o'chirildi</b><p class="hint" style="margin:4px 0 0">Oila ma'lumotlari ikkala telefondan ham o'chdi. Endi noldan boshlang.</p></div>` : ""}
+    <form id="f" novalidate>
       <div class="field"><label for="w-name">Xotinning ismi</label><input class="input" id="w-name" name="wife" autocomplete="off" maxlength="30" required></div>
       <div class="field"><label for="h-name">Erning ismi</label><input class="input" id="h-name" name="husband" autocomplete="off" maxlength="30" required></div>
       <div class="field"><label for="f-name">Oila nomi</label><input class="input" id="f-name" name="family" value="Bizning uy" maxlength="40"></div>

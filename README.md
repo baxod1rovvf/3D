@@ -62,6 +62,7 @@ Note: Supabase pauses free projects after about a week with no use. A family tha
 - Each family has a long random secret key, which each phone keeps after setup or pairing. The site sends it with every request as the `x-family-key` header, and Row Level Security only returns rows whose `household_id` equals it. Without the key, every table looks empty.
 - A pairing code hands that key to the partner's phone. Codes are single-use, expire after 10 minutes, and the site allows at most 30 wrong guesses per 10 minutes, so they can't be guessed in practice. **Only type a code on your own family's phones.**
 - The **Uzish** button in Sozlamalar disconnects a phone. The data stays, and a new code reconnects it.
+- The **Orqaga** button (Sozlamalar → 🔄 Boshidan boshlash) deletes everything and starts from zero. After a confirmation, it permanently deletes the whole family on the server: groceries, meals, memories and photos, tasks, notifications, activity, meal times, both people and their push subscriptions. It also clears everything the app saved on that phone (theme, quiet hours, cache). The partner's phone is told right away, or the next time it opens, and goes back to the welcome screen too. This can't be undone. It needs no SQL change: every table is linked to `households` with `on delete cascade`.
 
 ## Alternative: Cloudflare Worker + D1
 
@@ -70,6 +71,8 @@ If you'd rather not use Supabase, `cloudflare/worker.js` provides the same backe
 2. Create a Worker, paste the file into it, and deploy.
 3. Add a D1 binding named `DB` that points to `oila`.
 4. Put the Worker address into `API_URL` in `js/config.js`, and leave the Supabase fields empty.
+
+If you already run the Worker, paste `cloudflare/worker.js` again and deploy it so that **Orqaga** can delete the family.
 
 ## Features and notifications
 
@@ -96,7 +99,7 @@ The function creates its own push keys on first use and keeps them in `push_keys
 ```
 node --test tests/*.test.js          # unit tests
 node tools/build-push.mjs --check    # index.ts is up to date
-bash tests/sql/run.sh                # SQL tests (needs a local PostgreSQL 16 on port 5499, socket /tmp/oila-pgtest)
+bash tests/sql/run.sh                # SQL tests, including the Orqaga delete (needs a local PostgreSQL 16 on port 5499, socket /tmp/oila-pgtest)
 python3 -m http.server 8765 &        # then run each tests/e2e/*.spec.js with node
 ```
 

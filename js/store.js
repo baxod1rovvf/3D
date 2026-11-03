@@ -33,6 +33,11 @@
     me() { return this.get("oila-me"); },
   };
 
+  /* The family was deleted on the other phone ("Orqaga" in Settings). app.js listens for this event,
+     forgets the family on this phone and opens the welcome screen. Ignored on the phone doing the reset. */
+  let resetting = false;
+  const familyGone = () => { if (!resetting) window.dispatchEvent(new Event("oila:family-gone")); };
+
   const SETTINGS_DEFAULTS = { breakfast: "08:00", lunch: "13:00", dinner: "19:00", timezone: null, leadHours: 2 };
 
   function sortRows(rows, opts = {}) {
@@ -66,7 +71,7 @@
     async function poll() {
       if (document.hidden || !subscribers.size) return;
       let next;
-      try { next = await call("/versions"); } catch (e) { return; }
+      try { next = await call("/versions"); } catch (e) { if (e.status === 404) familyGone(); return; }
       const changed = versions ? Object.keys(next).filter((t) => next[t] !== versions[t]) : [];
       versions = next;
       changed.forEach((t) => subscribers.forEach((s) => s(t)));
@@ -90,6 +95,8 @@
         Device.set("oila-family-key", k);
         return k;
       },
+
+      async deleteFamily() { await call("/family", { method: "DELETE" }); },
 
       async createPairCode() { return (await call("/pair", { method: "POST", body: {} })).code; },
       async claimPairCode(code) {
@@ -176,7 +183,10 @@
       if (channel) return channel;
       const c = await client();
       channel = c.channel("oila-" + key(), { config: { broadcast: { self: false } } });
-      channel.on("broadcast", { event: "change" }, ({ payload }) => listeners.forEach((l) => l(payload.table, payload)));
+      channel.on("broadcast", { event: "change" }, ({ payload }) => {
+        if (payload.table === "households" && payload.eventType === "DELETE") return familyGone();
+        listeners.forEach((l) => l(payload.table, payload));
+      });
       channel.subscribe();
       document.addEventListener("visibilitychange", () => { if (!document.hidden) listeners.forEach((l) => l("*", {})); });
       return channel;
@@ -206,6 +216,19 @@
         ]));
         Device.set("oila-family-key", k);
         return k;
+      },
+
+      // Every family table references households(key) with ON DELETE CASCADE, so this one delete
+      // removes all of the family's rows (photos, settings and push subscriptions included).
+      async deleteFamily() {
+        const c = await client();
+        check(await c.from("households").delete().eq("key", key()));
+        // Tell the partner's open app now (it also finds out on its next open); wait briefly so the
+        // message leaves before this page navigates away.
+        try {
+          const sent = (await room()).send({ type: "broadcast", event: "change", payload: { table: "households", eventType: "DELETE" } });
+          await Promise.race([sent, new Promise((res) => setTimeout(res, 2000))]);
+        } catch (e) { console.warn(e); }
       },
 
       async createPairCode() { const c = await client(); return check(await c.rpc("create_pair_code")); },
@@ -399,8 +422,15 @@
       listeners.forEach((l) => l(table, payload));
       if (bc) bc.postMessage({ table, payload: JSON.parse(JSON.stringify(payload)) });
     };
-    if (bc) bc.onmessage = (m) => listeners.forEach((l) => l(m.data.table || "*", m.data.payload || {}));
-    window.addEventListener("storage", (e) => { if (e.key === KEY) listeners.forEach((l) => l("*", {})); });
+    if (bc) bc.onmessage = (m) => {
+      if (m.data.table === "households") return familyGone();
+      listeners.forEach((l) => l(m.data.table || "*", m.data.payload || {}));
+    };
+    window.addEventListener("storage", (e) => {
+      if (e.key !== KEY) return;
+      if (e.newValue === null) return familyGone(); // the other tab pressed "Orqaga"
+      listeners.forEach((l) => l("*", {}));
+    });
 
     return {
       mode: "demo",
@@ -413,6 +443,10 @@
         write(seed(wifeName, husbandName, familyName));
         Device.set("oila-family-key", HH);
         return HH;
+      },
+      async deleteFamily() {
+        try { localStorage.removeItem(KEY); localStorage.removeItem("oila-demo-pair"); } catch (e) {}
+        if (bc) bc.postMessage({ table: "households", payload: { eventType: "DELETE" } });
       },
 
       async createPairCode() {
@@ -515,7 +549,11 @@
     backend.family = async (k) => {
       const ck = PREFIX + (k || Device.key() || "") + ":family";
       const hit = get(ck);
-      const fresh = family(k).then((v) => { if (v) put(ck, v); else localStorage.removeItem(ck); return v; });
+      const fresh = family(k).then((v) => {
+        if (v) put(ck, v);
+        else { localStorage.removeItem(ck); if (hit && !k) familyGone(); } // deleted on the other phone
+        return v;
+      });
       if (hit) { fresh.catch(() => {}); return hit; }
       return fresh;
     };
@@ -580,6 +618,24 @@
     /** Disconnect this phone (the family's data stays). */
     forgetDevice() {
       if (backend.dropCache) backend.dropCache(); Device.del("oila-family-key"); Device.del("oila-me"); },
+    /**
+     * "Orqaga": delete the whole family on the server (every section, photos, settings, both people),
+     * then everything this app keeps on this phone. The other phone is told and goes back to the start.
+     * Throws if the server delete fails; then nothing on this phone is touched.
+     */
+    async startOver() {
+      resetting = true;
+      try { await backend.deleteFamily(); } catch (e) { resetting = false; throw e; }
+      Store.wipeDevice();
+    },
+    /** Remove every "oila-…" key (family key, who I am, cached pages, theme, quiet hours, queues). */
+    wipeDevice() {
+      for (const s of [localStorage, sessionStorage]) {
+        try { Object.keys(s).filter((k) => k.startsWith("oila-")).forEach((k) => s.removeItem(k)); } catch (e) {}
+      }
+      try { if (window.caches) caches.delete("oila-prefs").catch(() => {}); } catch (e) {}
+      Store.ctx = null;
+    },
 
     /**
      * Record a third-person entry in the shared activity feed, and send a typed, playful notification
