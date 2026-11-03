@@ -417,6 +417,11 @@
           <div class="row">${avatar(c.profile)}<div class="grow"><div class="title">${esc(c.profile.full_name)} <span class="chip">Siz</span></div><div class="meta">${c.profile.role === "er" ? "Er" : "Xotin"}</div></div></div>
           ${c.partner ? `<div class="row">${avatar(c.partner)}<div class="grow"><div class="title">${esc(c.partner.full_name)}</div><div class="meta">${c.partner.role === "er" ? "Er" : "Xotin"}</div></div></div>` : ""}
         </div>
+        <div class="section"><div class="section-head"><h2>\uD83D\uDD04 Yangilash</h2></div>
+          <div class="card" style="padding:14px">
+            <p class="hint" style="margin:0 0 12px">Ilovaning eng yangi versiyasini va juftingiz qo'shgan so'nggi narsalarni yuklaydi.<span data-version></span></p>
+            <button class="btn primary block" data-refresh><i data-lucide="refresh-cw"></i>Yangilash</button>
+          </div></div>
         <div class="section"><div class="section-head"><h2>\uD83D\uDCF2 Ilovani o'rnatish</h2></div>
           <div class="card list" data-install-row>${installRow()}</div></div>
         <div class="section"><div class="section-head"><h2>\uD83D\uDD14 Bildirishnomalar</h2></div>
@@ -454,7 +459,7 @@
             <button class="row" data-pair-show style="width:100%;border:0;background:none;text-align:left"><i data-lucide="smartphone"></i><div class="grow"><div class="title">Qurilmani ulash</div><div class="meta">Juftingiz telefoni uchun kod olish</div></div><i data-lucide="chevron-right"></i></button>
             <button class="row" data-pair-enter style="width:100%;border:0;background:none;text-align:left"><i data-lucide="keyboard"></i><div class="grow"><div class="title">Menda kod bor</div><div class="meta">Juftingiz bergan kodni kiritish</div></div><i data-lucide="chevron-right"></i></button>
           </div></div>
-        <div class="section" data-reset-section><div class="section-head"><h2>\uD83D\uDD04 Boshidan boshlash</h2></div>
+        <div class="section" data-reset-section><div class="section-head"><h2>\uD83E\uDDF9 Boshidan boshlash</h2></div>
           <div class="card" style="padding:14px">
             <p class="hint" style="margin:0 0 12px">Ro'zg'or, taomlar, xotiralar, uy ishlari, bildirishnomalar va sozlamalar ikkala telefondan ham butunlay o'chadi. Ilova birinchi kundagidek noldan boshlanadi.</p>
             <button class="btn danger block" data-reset><i data-lucide="rotate-ccw"></i>Orqaga</button>
@@ -522,6 +527,16 @@
           await withTimeout(disablePushQuietly());
           Store.forgetDevice(); location.href = "kirish.html";
         });
+        // Refresh: newest app files and data, then reload.
+        appVersion().then((v) => { if (v) $("[data-version]", el).textContent = ` Hozirgi versiya: ${v}.`; });
+        $("[data-refresh]", el).addEventListener("click", async (ev) => {
+          const btn = ev.currentTarget;
+          btn.disabled = true; btn.classList.add("spinning");
+          if (await refreshApp()) return; // the page reloads
+          btn.disabled = false; btn.classList.remove("spinning");
+          toast("Yangilab bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.", "wifi-off");
+        });
+
         $("[data-reset]", el).addEventListener("click", async () => {
           api.close();
           const family = (Store.ctx.household && Store.ctx.household.name) || "Bizning uy";
@@ -563,6 +578,35 @@
   function setTheme(t) { try { localStorage.setItem(THEME_KEY, t); } catch (e) {} applyTheme(t); }
   applyTheme(); // runs in <head>, before the page paints
   if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme());
+
+  /* ---------- "Yangilash" (Settings): the newest app and fresh data ----------
+     Pages and code come from the service worker's copy and update in the background, so on their
+     own new features show up only on a later open. This asks the network for every app file now
+     (cache: "reload" skips all caches; the service worker stores what comes back), drops the
+     cached lists so data comes fresh too, and reloads. Resolves false if any file could not be
+     fetched (offline): then nothing changes, so old and new files never mix. */
+  async function refreshApp() {
+    if (navigator.onLine === false) return false;
+    const files = new Set(["./", "kirish.html", ...TABS.map((t) => t.href)].map((h) => new URL(h, location.href).href));
+    document.querySelectorAll("script[src], link[rel=stylesheet][href], link[rel=manifest][href]").forEach((n) => {
+      const u = new URL(n.getAttribute("src") || n.getAttribute("href"), location.href);
+      if (u.origin === location.origin) files.add(u.href);
+    });
+    const got = await Promise.all([...files].map((u) => withTimeout(fetch(u, { cache: "reload", credentials: "same-origin", headers: { "x-oila-fresh": "1" } }).then((r) => r.ok, () => false), 8000)));
+    if (!got.every(Boolean)) return false;
+    // A changed sw.js installs now; when it takes over, the page reloads itself (controllerchange).
+    try {
+      const reg = "serviceWorker" in navigator ? await withTimeout(navigator.serviceWorker.getRegistration(), 2000) : null;
+      if (reg) await withTimeout(reg.update(), 4000);
+    } catch (e) { console.warn("sw update", e); }
+    if (Store.dropCache) Store.dropCache();
+    location.reload();
+    return true;
+  }
+  /** "v6" from the service worker's cache name, or null before it is installed. */
+  async function appVersion() {
+    try { const k = (await caches.keys()).find((n) => /^oila-v\d+$/.test(n)); return k ? k.slice(5) : null; } catch (e) { return null; }
+  }
 
   /* The partner pressed "Orqaga": the family no longer exists, so this phone starts over too. */
   let familyGoneHandled = false;
@@ -709,6 +753,23 @@
   }
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch((e) => console.warn("sw", e)));
+    // A new version took over (sw.js changed): reload once so this page runs it too. Not on the
+    // very first install, when no older version was on screen.
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      location.reload();
+    });
+    // Installed apps are mostly resumed, not reopened, and the browser only looks for a new sw.js
+    // when a page opens. So also look when the app comes back on screen (at most every 10 minutes).
+    let lastCheck = Date.now();
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden || Date.now() - lastCheck < 10 * 60 * 1000) return;
+      lastCheck = Date.now();
+      navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {});
+    });
   }
 
   /* ---------- instant section switching (one page, like a single index.html) ----------

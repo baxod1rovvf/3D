@@ -402,6 +402,10 @@ img { display: block; max-width: 100%; }
   .tab.active .pill { animation: pop 420ms var(--bounce); }
   .btn.primary:hover .emo, .btn.accent:hover .emo { animation: wiggle 500ms ease; }
 }
+/* "Yangilash" while it works */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinning svg { animation: spin .9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .spinning svg { animation: none; } }
 @keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-14px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes toast-out { to { opacity: 0; transform: translateY(-8px); } }
