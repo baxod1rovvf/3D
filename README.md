@@ -53,6 +53,8 @@ Run the SQL **before** publishing an update, so the database already has what th
 
 (If the site goes out first by mistake, notifications still save in the old format until the SQL is run.)
 
+**How phones get the new version.** Bump `CACHE` in `sw.js` (for example `oila-v6` → `oila-v7`) with every release. When the app is opened, or brought back on screen (checked at most every 10 minutes), the new service worker downloads the new files and the app reloads once into the new version. To get it at any moment, or to fetch the partner's latest changes, tap **⚙ Sozlamalar → 🔄 Yangilash**. It downloads every app file fresh and reloads. The same card shows the version the phone is running (for example `v6`).
+
 Changes reach the other phone right away through Supabase Realtime broadcast. Memory photos are compressed and saved in the `photos` table, so no Storage bucket is needed. The free plan's 500 MB database holds a couple of thousand photos.
 
 Note: Supabase pauses free projects after about a week with no use. A family that opens the site every few days keeps it active, and a paused project can be restored from the dashboard.
@@ -62,7 +64,7 @@ Note: Supabase pauses free projects after about a week with no use. A family tha
 - Each family has a long random secret key, which each phone keeps after setup or pairing. The site sends it with every request as the `x-family-key` header, and Row Level Security only returns rows whose `household_id` equals it. Without the key, every table looks empty.
 - A pairing code hands that key to the partner's phone. Codes are single-use, expire after 10 minutes, and the site allows at most 30 wrong guesses per 10 minutes, so they can't be guessed in practice. **Only type a code on your own family's phones.**
 - The **Uzish** button in Sozlamalar disconnects a phone. The data stays, and a new code reconnects it.
-- The **Orqaga** button (Sozlamalar → 🔄 Boshidan boshlash) deletes everything and starts from zero. After a confirmation, it permanently deletes the whole family on the server: groceries, meals, memories and photos, tasks, notifications, activity, meal times, both people and their push subscriptions. It also clears everything the app saved on that phone (theme, quiet hours, cache). The partner's phone is told right away, or the next time it opens, and goes back to the welcome screen too. This can't be undone. It needs no SQL change: every table is linked to `households` with `on delete cascade`.
+- The **Orqaga** button (Sozlamalar → 🧹 Boshidan boshlash) deletes everything and starts from zero. After a confirmation, it permanently deletes the whole family on the server: groceries, meals, memories and photos, tasks, notifications, activity, meal times, both people and their push subscriptions. It also clears everything the app saved on that phone (theme, quiet hours, cache). The partner's phone is told right away, or the next time it opens, and goes back to the welcome screen too. This can't be undone. It needs no SQL change: every table is linked to `households` with `on delete cascade`.
 
 ## Alternative: Cloudflare Worker + D1
 
