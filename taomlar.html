@@ -69,8 +69,8 @@
   .recipe-card .ph { aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--accent-soft); font-size: 54px; }
   .recipe-card .ph img { width: 100%; height: 100%; object-fit: cover; }
   .recipe-card .tx { padding: 10px 12px 12px; }
-  .recipe-card .tt { font-family: var(--display); font-weight: 600; font-size: 16px; line-height: 1.2; }
-  .recipe-card .mt { font-size: 12.5px; color: var(--muted); font-weight: 700; margin-top: 2px; }
+  .recipe-card .tt { display: block; font-family: var(--display); font-weight: 600; font-size: 16px; line-height: 1.2; }
+  .recipe-card .mt { display: block; font-size: 12.5px; color: var(--muted); font-weight: 700; margin-top: 2px; }
   .recipe-add { width: 100%; margin-top: 14px; min-height: 52px; }
   .recipe-detail .hero { margin: 0 -16px 12px; aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--accent-soft); font-size: 80px; }
   .recipe-detail .hero img { width: 100%; height: 100%; object-fit: cover; }
@@ -141,6 +141,29 @@ let groceries = [];
 let recipes = [];
 let recipesMissing = false; // the recipes table isn't set up on the server yet
 let recipeUrls = {};
+
+/* ---------- built-in example dishes: shown until the family saves its own version ---------- */
+const EXAMPLES = [
+  { title: "Osh (Plov)", emoji: "🍚", ingredients: ["Guruch", "Sabzi", "Piyoz", "Mol go'shti", "Yog'", "Zira", "Sarimsoq"], steps: "Go'shtni yog'da qovuring, piyoz va sabzini qo'shing.\nZira, tuz soling, suv quyib zirvak qiling.\nGuruchni soling, suv ketgach dimlab qo'ying (25–30 daqiqa)." },
+  { title: "Somsa", emoji: "🥟", ingredients: ["Un", "Qo'y go'shti", "Piyoz", "Yog'", "Zira", "Tuxum"], steps: "Xamir qorib, yupqa yoying va yog' surting.\nMayda to'g'ralgan go'sht va piyozga zira, tuz qo'shing.\nUchburchak shaklida tugib, ustiga tuxum surting va tandir yoki duxovkada pishiring." },
+  { title: "Lag‘mon", emoji: "🍜", ingredients: ["Un", "Mol go'shti", "Bulg'or qalampiri", "Pomidor", "Piyoz", "Sarimsoq", "Sabzi"], steps: "Xamirdan cho'zma lag'mon tayyorlab, qaynoq suvda pishiring.\nGo'sht va sabzavotlarni qovurib, suv qo'shib vaju tayyorlang.\nLag'monni likopchaga solib, ustidan vaju quying." },
+  { title: "Manti", emoji: "🥟", ingredients: ["Un", "Qo'y go'shti", "Piyoz", "Yog'", "Zira"], steps: "Xamirni yupqa yoyib, kvadrat qilib kesing.\nQiymaga piyoz, tuz, zira qo'shing.\nTugib, qasqonda 40–45 daqiqa bug'da pishiring." },
+  { title: "Sho‘rva", emoji: "🍲", ingredients: ["Mol go'shti", "Kartoshka", "Sabzi", "Piyoz", "Pomidor", "Ko'k"], steps: "Go'shtni sovuq suvga solib qaynating, ko'pigini oling.\nSabzi, piyoz, pomidor, keyin kartoshkani qo'shing.\nPast olovda 1,5–2 soat qaynatib, ko'k sepib torting." },
+  { title: "Chuchvara", emoji: "🥟", ingredients: ["Un", "Mol go'shti", "Piyoz", "Tuxum", "Qatiq"], steps: "Xamirni yupqa yoyib, kichik kvadratlarga kesing.\nQiymani solib, chuchvara qilib tuging.\nQaynab turgan suvda yoki sho'rvada pishiring, qatiq bilan torting." },
+  { title: "Norin", emoji: "🍝", ingredients: ["Un", "Ot go'shti", "Piyoz", "Tuxum"], steps: "Go'shtni (qazi yoki ot go'shti) qaynatib, ingichka to'g'rang.\nXamirni yupqa yoyib qaynating va ingichka kesing.\nGo'sht, xamir va piyozni aralashtirib, sovuq holda torting." },
+  { title: "Dimlama", emoji: "🥘", ingredients: ["Mol go'shti", "Kartoshka", "Karam", "Sabzi", "Piyoz", "Pomidor", "Bulg'or qalampiri", "Baqlajon"], steps: "Qozon tagiga go'sht, ustiga piyoz, sabzi va boshqa sabzavotlarni qavat-qavat tering.\nTuz va ziravor sepib, ustini karam bargi bilan yoping.\nQopqog'ini zich yopib, past olovda 1,5 soat dimlang." },
+  { title: "Qozon kabob", emoji: "🍖", ingredients: ["Qo'y go'shti", "Kartoshka", "Piyoz", "Yog'", "Zira"], steps: "Go'shtni bo'laklab yog'da qizarguncha qovuring.\nKartoshkani alohida qovurib qo'shing.\nPiyoz halqalari va zira sepib, ozgina dimlab torting." },
+  { title: "Shashlik", emoji: "🍢", ingredients: ["Qo'y go'shti", "Piyoz", "Zira", "Qalampir", "Sirka"], steps: "Go'shtni bo'laklab, piyoz, zira, tuz va qalampir bilan 3–4 soat marinadlang.\nSixlarga terib, cho'g'da aylantirib pishiring.\nPiyoz va sirka bilan torting." },
+  { title: "Mastava", emoji: "🍲", ingredients: ["Guruch", "Mol go'shti", "Kartoshka", "Sabzi", "Piyoz", "Pomidor", "Qatiq"], steps: "Go'shtni mayda to'g'rab qovuring, sabzavotlarni qo'shing.\nSuv quyib qaynating, guruchni soling.\nGuruch pishguncha qaynatib, qatiq va ko'k bilan torting." },
+  { title: "Moshkichiri", emoji: "🥣", ingredients: ["Mosh", "Guruch", "Piyoz", "Sabzi", "Yog'", "Qatiq"], steps: "Moshni yarim pishguncha qaynating.\nQovurilgan piyoz, sabzi va guruchni qo'shing.\nSuv ketguncha pishirib dimlang, qatiq bilan torting." },
+  { title: "Moshxo‘rda", emoji: "🍲", ingredients: ["Mosh", "Guruch", "Mol go'shti", "Kartoshka", "Piyoz", "Sabzi", "Qatiq"], steps: "Moshni qaynatib qo'ying.\nGo'sht va sabzavotni qovurib, moshga qo'shing.\nGuruch solib, quyuq bo'lguncha qaynating, qatiq bilan torting." },
+  { title: "Gumma", emoji: "🥯", ingredients: ["Un", "Mol go'shti", "Piyoz", "Yog'", "Xamirturush"], steps: "Xamirturushli xamir qorib oshiring.\nQiyma va piyozdan ichlik tayyorlang.\nXamirga ichlikni solib tuging va qaynoq yog'da qizartirib qovuring." },
+].map((r, i) => ({ ...r, id: `ex-${i}`, example: true, photo_path: null }));
+/** The family's recipes plus the examples they haven't saved a version of yet (matched by name). */
+function allRecipes() {
+  const own = new Set(recipes.map((r) => Stickers.normalize(r.title)));
+  return [...recipes, ...EXAMPLES.filter((x) => !own.has(Stickers.normalize(x.title)))];
+}
 
 async function render() {
   [meals, groceries] = await Promise.all([Store.list("meals", { order: "created_at", asc: true }), Store.list("grocery_items")]);
@@ -216,20 +239,19 @@ const recipeChip = (g) => `<span class="chip ing"><span class="emo" aria-hidden=
 
 function drawRecipes() {
   const pane = $("#recipes-pane");
-  if (recipesMissing) {
-    pane.innerHTML = `<div class="empty recipe-empty"><div class="ico emo" aria-hidden="true">🛠️</div><strong>Retseptlar uchun serverni sozlang</strong><p>Supabase → SQL Editor'da <b>supabase/recipes.sql</b> faylini bir marta ishga tushiring.</p></div>`;
-    return;
-  }
-  pane.innerHTML = `<button class="btn primary recipe-add" id="recipe-add"><i data-lucide="plus"></i>Taom qo'shish</button>` +
-    (recipes.length ? `<div class="recipes">${recipes.map((r) => `<button class="recipe-card" data-rid="${r.id}">
-        <span class="ph">${recipeUrls[r.photo_path] ? `<img src="${esc(recipeUrls[r.photo_path])}" alt="">` : `<span class="emo" aria-hidden="true">${r.emoji || dishEmoji(r.title)}</span>`}</span>
+  const list = allRecipes();
+  pane.innerHTML = (recipesMissing
+    ? `<div class="empty recipe-empty"><div class="ico emo" aria-hidden="true">🛠️</div><strong>Retseptlar uchun serverni sozlang</strong><p>Supabase → SQL Editor'da <b>supabase/recipes.sql</b> faylini bir marta ishga tushiring.</p></div>`
+    : `<button class="btn primary recipe-add" id="recipe-add"><i data-lucide="plus"></i>Taom qo'shish</button>`) +
+    (list.length ? `<div class="recipes">${list.map((r) => `<button class="recipe-card" data-rid="${r.id}">
+        <span class="ph">${recipeUrls[r.photo_path] ? `<img src="${esc(recipeUrls[r.photo_path])}" alt="">` : `<span class="emo" aria-hidden="true">${esc(r.emoji || dishEmoji(r.title))}</span>`}</span>
         <span class="tx"><span class="tt">${esc(r.title)}</span><span class="mt">${(r.ingredients || []).length} masalliq · ${lastMadeOf(r.title) ? (daysSince(lastMadeOf(r.title)) === 0 ? "bugun" : `${daysSince(lastMadeOf(r.title))} kun oldin`) : "hali pishirilmagan"}</span></span></button>`).join("")}</div>`
       : `<div class="empty recipe-empty"><div class="ico emo" aria-hidden="true">📖</div><strong>Hali taom yo'q</strong><p>Oilangiz yaxshi ko'radigan taomlarni rasmi va retsepti bilan qo'shing.</p></div>`);
   icons();
 }
 $("#recipes-pane").addEventListener("click", (e) => {
   if (e.target.closest("#recipe-add")) return openRecipeEditor();
-  const c = e.target.closest("[data-rid]"); if (c) openRecipe(recipes.find((r) => r.id === c.dataset.rid));
+  const c = e.target.closest("[data-rid]"); if (c) openRecipe(allRecipes().find((r) => r.id === c.dataset.rid));
 });
 
 /** Put a recipe (or any named dish) on today's menu in the chosen slot. */
@@ -262,20 +284,23 @@ function openRecipe(r) {
   App.sheet({
     title: "Taom 🍲",
     body: `<div class="recipe-detail">
-        <div class="hero">${recipeUrls[r.photo_path] ? `<img src="${esc(recipeUrls[r.photo_path])}" alt="${esc(r.title)}">` : `<span class="emo" aria-hidden="true">${r.emoji || dishEmoji(r.title)}</span>`}</div>
+        <div class="hero">${recipeUrls[r.photo_path] ? `<img src="${esc(recipeUrls[r.photo_path])}" alt="${esc(r.title)}">` : `<span class="emo" aria-hidden="true">${esc(r.emoji || dishEmoji(r.title))}</span>`}</div>
         <h2>${esc(r.title)}</h2>
         ${(r.ingredients || []).length ? `<div class="ings">${r.ingredients.map(recipeChip).join("")}</div>` : ""}
         ${r.steps ? `<p class="steps">${esc(r.steps)}</p>` : ""}
         <button class="btn primary block" data-today style="margin-top:16px"><span class="emo" aria-hidden="true">🍳</span> Bugun shu pishiriladi</button>
         ${(r.ingredients || []).length ? `<button class="btn ghost block" data-to-grocery style="margin-top:10px"><i data-lucide="shopping-basket"></i>Masalliqlarni Ro'zg'orga</button>` : ""}
       </div>`,
-    foot: `<button class="btn danger" data-del-recipe aria-label="Retseptni o'chirish"><i data-lucide="trash-2"></i></button><button class="btn ghost" data-edit-recipe><i data-lucide="pencil"></i>Tahrirlash</button>`,
+    foot: r.example || recipesMissing ? (recipesMissing ? "" : `<button class="btn ghost block" data-edit-recipe><i data-lucide="pencil"></i>O'zimizcha tahrirlash</button>`)
+      : `<button class="btn danger" data-del-recipe aria-label="Retseptni o'chirish"><i data-lucide="trash-2"></i></button><button class="btn ghost" data-edit-recipe><i data-lucide="pencil"></i>Tahrirlash</button>`,
     onMount(el, api) {
       $("[data-today]", el).addEventListener("click", () => { api.close(); setTimeout(() => pickSlot(r.title, (slot) => addMealToday(r, slot)), 300); });
       const g = $("[data-to-grocery]", el);
       if (g) g.addEventListener("click", () => { api.close(); setTimeout(() => sendToGrocery(r.ingredients, r.title), 300); });
-      $("[data-edit-recipe]", el).addEventListener("click", () => { api.close(); setTimeout(() => openRecipeEditor(r), 300); });
-      $("[data-del-recipe]", el).addEventListener("click", async () => {
+      const ed = $("[data-edit-recipe]", el);
+      if (ed) ed.addEventListener("click", () => { api.close(); setTimeout(() => openRecipeEditor(r), 300); });
+      const del = $("[data-del-recipe]", el);
+      if (del) del.addEventListener("click", async () => {
         api.close();
         if (!(await App.confirm(`«${r.title}» retsepti o'chiriladi.`, "Retseptni o'chirish"))) return;
         try {
@@ -292,12 +317,12 @@ function openRecipe(r) {
 }
 
 function openRecipeEditor(r) {
-  const isNew = !r;
+  const isNew = !r || !!r.example; // an example becomes the family's own recipe on save
   const it = r || { title: "", ingredients: [], steps: "", photo_path: null };
   let cat = RECIPE_CATS[0].id, blob = null;
   const norm = (n) => Stickers.normalize(n);
   App.sheet({
-    title: isNew ? "Yangi taom 🍲" : "Taomni tahrirlash ✏️",
+    title: !r ? "Yangi taom 🍲" : "Taomni tahrirlash ✏️",
     body: `<form id="rform" novalidate>
       <div class="field"><span class="label">Rasm</span>
         <label class="drop" id="r-drop">${recipeUrls[it.photo_path] ? `<img src="${esc(recipeUrls[it.photo_path])}" alt=""><span class="change">Almashtirish</span>` : `<span><span class="emo" style="font-size:30px" aria-hidden="true">📷</span><br>Rasm tanlash</span>`}
@@ -344,7 +369,7 @@ function openRecipeEditor(r) {
           catch (err) { console.warn("photo", err); photoLost = true; }
         }
         try {
-          if (isNew) await Store.insert("recipes", { ...v, photo_path: v.photo_path || null, created_by: Store.ctx.profile.id });
+          if (isNew) await Store.insert("recipes", { ...v, ...(r && r.example ? { emoji: r.emoji } : {}), photo_path: v.photo_path || null, created_by: Store.ctx.profile.id });
           else await Store.update("recipes", it.id, v);
           api.close(); await render();
           App.toast(photoLost ? "Rasm yuklanmadi — retsept rasmsiz saqlandi" : isNew ? `«${title}» saqlandi 🍲` : "Saqlandi", photoLost ? "image-off" : "check");
@@ -356,7 +381,7 @@ function openRecipeEditor(r) {
 
 /* ---------- 🤔 "Bugun nima pishiramiz?": 3 meals not made for the longest time ---------- */
 function openSuggestions() {
-  const all = Suggest.meals({ recipes, meals, today: App.today() });
+  const all = Suggest.meals({ recipes: allRecipes(), meals, today: App.today() });
   let page = 0;
   const latestMeal = (title) => [...meals].reverse().find((m) => Stickers.normalize(m.title) === Stickers.normalize(title));
   App.sheet({
@@ -373,7 +398,7 @@ function openSuggestions() {
         const chunk = all.slice(page * 3, page * 3 + 3);
         box.innerHTML = `<p class="hint" style="margin:0 0 10px">Ko'pdan beri pishirilmagan taomlar:</p>` + chunk.map((x, i) => {
           const r = x.recipe, img = r && recipeUrls[r.photo_path];
-          return `<button class="sugg-card" data-i="${page * 3 + i}"><span class="ph">${img ? `<img src="${esc(img)}" alt="">` : `<span class="emo" aria-hidden="true">${(r && r.emoji) || dishEmoji(x.title)}</span>`}</span>
+          return `<button class="sugg-card" data-i="${page * 3 + i}"><span class="ph">${img ? `<img src="${esc(img)}" alt="">` : `<span class="emo" aria-hidden="true">${esc((r && r.emoji) || dishEmoji(x.title))}</span>`}</span>
             <span class="nm">${esc(x.title)}<small>${x.lastMade ? `oxirgi marta ${x.daysAgo} kun oldin` : "hali pishirilmagan"}${r ? " · 📖 retsept" : ""}</small></span><i data-lucide="chevron-right"></i></button>`;
         }).join("") + (all.length > 3 ? `<button class="btn ghost block" data-more><i data-lucide="refresh-cw"></i>Boshqalarini ko'rsat</button>` : "");
         icons();

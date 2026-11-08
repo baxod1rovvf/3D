@@ -102,33 +102,38 @@ const today = (p) => p.evaluate(() => App.today());
   assert.ok(saved && !saved.photo_path, "saved without a photo");
   assert.deepEqual(noPhoto.errors, []);
 
-  // ---- "Bugun nima pishiramiz?": 3 suggestions, next page, add to today, empty state
+  // ---- Built-in examples: 14 dishes listed, read-only until edited into the family's own
+  const ex = await setup(browser);
+  await ex.p.goto(BASE + "/taomlar.html"); await ex.p.waitForSelector(".recipe-card");
+  const titles = await ex.p.$$eval(".recipe-card .tt", (els) => els.map((e) => e.textContent));
+  for (const t of ["Osh (Plov)", "Somsa", "Lag‘mon", "Manti", "Sho‘rva", "Chuchvara", "Norin", "Dimlama", "Qozon kabob", "Shashlik", "Mastava", "Moshkichiri", "Moshxo‘rda", "Gumma"]) assert.ok(titles.includes(t), "example " + t + " in " + titles.join(", "));
+  await ex.p.locator(".recipe-card", { hasText: "Osh (Plov)" }).click(); await ex.p.waitForSelector(".sheet.open .recipe-detail");
+  assert.match(await ex.p.textContent(".sheet .recipe-detail .ings"), /Guruch/);
+  assert.strictEqual(await ex.p.locator(".sheet [data-del-recipe]").count(), 0, "examples can't be deleted");
+  await ex.p.click(".sheet [data-edit-recipe]"); await ex.p.waitForSelector(".sheet.open #r-title");
+  assert.strictEqual(await ex.p.inputValue("#r-title"), "Osh (Plov)");
+  await ex.p.fill("#r-steps", "Bizning usul."); await ex.p.click(".sheet [data-save]"); await ex.p.waitForTimeout(600);
+  const own = await ex.p.evaluate(async () => (await Store.list("recipes")).filter((r) => r.title === "Osh (Plov)"));
+  assert.strictEqual(own.length, 1, "saved as the family's recipe"); assert.strictEqual(own[0].steps, "Bizning usul.");
+  assert.strictEqual(await ex.p.locator(".recipe-card", { hasText: "Osh (Plov)" }).count(), 1, "no duplicate card");
+  assert.deepEqual(ex.errors, []);
+
+  // ---- "Bugun nima pishiramiz?": 3 suggestions, paging, add to today
   const sg = await setup(browser);
   await sg.p.goto(BASE + "/taomlar.html"); await sg.p.waitForSelector("#recipe-add");
-  await sg.p.evaluate(async () => {
-    for (const title of ["Chuchvara", "Dimlama", "Norin"]) await Store.insert("recipes", { title, ingredients: ["Un"], steps: "", emoji: "🥟", photo_path: null });
-  });
-  await sg.p.reload(); await sg.p.waitForSelector("#recipe-add");
   await sg.p.click("#suggest-btn"); await sg.p.waitForSelector(".sheet.open .sugg-card");
-  let cards = await sg.p.$$eval(".sheet .sugg-card", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
+  const page = () => sg.p.$$eval(".sheet .sugg-card", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
+  let cards = await page();
   assert.strictEqual(cards.length, 3, cards.join(" | "));
-  assert.match(cards[0], /Chuchvara.*hali pishirilmagan/);
-  assert.match(cards[2], /Norin/);
-  await sg.p.click(".sheet [data-more]"); await sg.p.waitForTimeout(200);
-  cards = await sg.p.$$eval(".sheet .sugg-card", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
-  assert.match(cards[0], /Manti.*oxirgi marta 3 kun oldin/, cards.join(" | ")); // demo seed planned Manti 3 days ago
+  assert.match(cards[0], /Chuchvara.*hali pishirilmagan/, cards.join(" | "));
+  for (let k = 0; k < 8 && !cards.some((c) => /Manti/.test(c)); k++) { await sg.p.click(".sheet [data-more]"); await sg.p.waitForTimeout(150); cards = await page(); }
+  assert.match(cards.find((c) => /Manti/.test(c)) || "", /oxirgi marta 3 kun oldin/, cards.join(" | ")); // demo seed planned Manti 3 days ago
   await sg.p.locator(".sheet .sugg-card", { hasText: "Manti" }).click();
   await sg.p.waitForSelector('.sheet.open [data-slot="tushlik"]'); await sg.p.click('.sheet [data-slot="tushlik"]'); await sg.p.waitForTimeout(600);
   const t2 = await today(sg.p);
-  assert.strictEqual(await sg.p.evaluate(async (d) => (await Store.list("meals")).filter((m) => m.day_date === d && m.slot === "tushlik" && m.title === "Manti").length, t2), 1);
-  // nothing to suggest → empty state with a "Taom qo'shish" button
-  await sg.p.evaluate(async () => {
-    for (const m of await Store.list("meals")) await Store.remove("meals", m.id);
-    for (const r of await Store.list("recipes")) await Store.remove("recipes", r.id);
-  });
-  await sg.p.reload(); await sg.p.waitForSelector("#recipe-add");
-  await sg.p.click("#suggest-btn"); await sg.p.waitForSelector(".sheet.open [data-suggest-add]");
-  await sg.p.click(".sheet [data-suggest-add]"); await sg.p.waitForSelector(".sheet.open #r-title");
+  const manti = await sg.p.evaluate(async (d) => (await Store.list("meals")).filter((m) => m.day_date === d && m.slot === "tushlik" && m.title === "Manti"), t2);
+  assert.strictEqual(manti.length, 1);
+  assert.ok(manti[0].ingredients.includes("Un"), "example ingredients carried over");
   assert.deepEqual(sg.errors, []);
 
   console.log("PASS recipes.spec: recipes and suggestions");
