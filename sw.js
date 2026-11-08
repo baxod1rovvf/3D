@@ -2,7 +2,7 @@
 const CACHE = "oila-v6";
 const SHELL = [
   "./", "index.html", "rozgor.html", "taomlar.html", "xotiralar.html", "uy-ishlari.html", "kirish.html",
-  "css/app.css", "js/stickers.js", "js/catalog.js", "js/messages.js", "js/reminders.js", "js/store.js", "js/app.js",
+  "css/app.css", "js/stickers.js", "js/catalog.js", "js/suggest.js", "js/messages.js", "js/reminders.js", "js/store.js", "js/app.js",
   "assets/icon.svg", "assets/icon-192.png", "assets/icon-512.png", "manifest.webmanifest",
 ];
 

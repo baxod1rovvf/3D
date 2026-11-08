@@ -16,6 +16,7 @@
 <script src="js/config.js"></script>
 <script src="js/stickers.js"></script>
 <script src="js/catalog.js"></script>
+<script src="js/suggest.js"></script>
 <script src="js/messages.js"></script>
 <script src="js/reminders.js"></script>
 <script src="js/store.js"></script>
@@ -80,6 +81,12 @@
   .slot-pick button { min-height: 64px; border: 2px solid var(--line); border-radius: 18px; background: var(--surface); font-weight: 800; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--ink); }
   .slot-pick button .emo { font-size: 24px; }
   .recipe-empty { margin-top: 24px; }
+  .suggest-btn { margin: 12px 0 4px; min-height: 52px; font-size: 16px; }
+  .sugg-card { display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 10px; padding: 10px; border: 2px solid var(--line); border-radius: 20px; background: var(--surface); text-align: left; color: var(--ink); }
+  .sugg-card .ph { width: 64px; height: 64px; flex: none; border-radius: 16px; overflow: hidden; display: grid; place-items: center; background: var(--accent-soft); font-size: 34px; }
+  .sugg-card .ph img { width: 100%; height: 100%; object-fit: cover; }
+  .sugg-card .nm { flex: 1; font-family: var(--display); font-weight: 600; font-size: 17px; }
+  .sugg-card .nm small { display: block; font-family: var(--font); font-size: 13px; font-weight: 700; color: var(--muted); }
   .drop { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; border: 2px dashed var(--accent); border-radius: 22px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; overflow: hidden; text-align: center; font-size: 14px; }
   .drop img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
@@ -110,6 +117,7 @@
       <button role="tab" data-tab="recipes">📖 Retseptlar</button>
     </div>
     <div id="menu-pane">
+    <button class="btn accent block suggest-btn" id="suggest-btn"><span class="emo" aria-hidden="true">🤔</span> Bugun nima pishiramiz?</button>
     <div class="weeknav">
       <button class="icon-btn" id="prev" aria-label="Oldingi hafta"><i data-lucide="chevron-left"></i></button>
       <span class="label" id="wlabel"></span>
@@ -457,6 +465,45 @@ function openRecipeEditor(r) {
     },
   });
 }
+
+/* ---------- 🤔 "Bugun nima pishiramiz?": 3 meals not made for the longest time ---------- */
+function openSuggestions() {
+  const all = Suggest.meals({ recipes, meals, today: App.today() });
+  let page = 0;
+  const latestMeal = (title) => [...meals].reverse().find((m) => Stickers.normalize(m.title) === Stickers.normalize(title));
+  App.sheet({
+    title: "Bugun nima pishiramiz? 🤔",
+    body: `<div data-sugg></div>`,
+    onMount(el, api) {
+      const box = $("[data-sugg]", el);
+      const draw = () => {
+        if (!all.length) {
+          box.innerHTML = `<div class="empty"><div class="ico emo" aria-hidden="true">📖</div><strong>Hali taklif qiladigan taom yo'q</strong><p>Retsept qo'shing yoki menyuni to'ldiring — keyin men eslatib turaman.</p>
+            <button class="btn primary" data-suggest-add><i data-lucide="plus"></i>Retsept qo'shish</button></div>`;
+          return icons();
+        }
+        const chunk = all.slice(page * 3, page * 3 + 3);
+        box.innerHTML = `<p class="hint" style="margin:0 0 10px">Ko'pdan beri pishirilmagan taomlar:</p>` + chunk.map((x, i) => {
+          const r = x.recipe, img = r && recipeUrls[r.photo_path];
+          return `<button class="sugg-card" data-i="${page * 3 + i}"><span class="ph">${img ? `<img src="${esc(img)}" alt="">` : `<span class="emo" aria-hidden="true">${(r && r.emoji) || dishEmoji(x.title)}</span>`}</span>
+            <span class="nm">${esc(x.title)}<small>${x.lastMade ? `oxirgi marta ${x.daysAgo} kun oldin` : "hali pishirilmagan"}${r ? " · 📖 retsept" : ""}</small></span><i data-lucide="chevron-right"></i></button>`;
+        }).join("") + (all.length > 3 ? `<button class="btn ghost block" data-more><i data-lucide="refresh-cw"></i>Boshqalarini ko'rsat</button>` : "");
+        icons();
+      };
+      draw();
+      box.addEventListener("click", (e) => {
+        if (e.target.closest("[data-suggest-add]")) { api.close(); setTab("recipes"); return setTimeout(() => openRecipeEditor(), 300); }
+        if (e.target.closest("[data-more]")) { page = (page + 1) * 3 >= all.length ? 0 : page + 1; return draw(); }
+        const c = e.target.closest("[data-i]"); if (!c) return;
+        const x = all[+c.dataset.i];
+        const src = x.recipe || { title: x.title, ingredients: (latestMeal(x.title) || {}).ingredients || [], steps: (latestMeal(x.title) || {}).notes || "" };
+        api.close();
+        setTimeout(() => pickSlot(x.title, (slot) => addMealToday(src, slot)), 300);
+      });
+    },
+  });
+}
+$("#suggest-btn").addEventListener("click", openSuggestions);
 
 /* ---------- favorites & past meals ---------- */
 function uniqueMeals(list) {

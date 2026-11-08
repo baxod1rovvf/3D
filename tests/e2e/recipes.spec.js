@@ -104,6 +104,35 @@ const today = (p) => p.evaluate(() => App.today());
   assert.ok(saved && !saved.photo_path, "saved without a photo");
   assert.deepEqual(noPhoto.errors, []);
 
-  console.log("PASS recipes.spec: recipes");
+  // ---- "Bugun nima pishiramiz?": 3 suggestions, next page, add to today, empty state
+  const sg = await setup(browser);
+  await sg.p.goto(BASE + "/taomlar.html"); await sg.p.waitForSelector(".slot");
+  await sg.p.evaluate(async () => {
+    for (const title of ["Chuchvara", "Dimlama", "Norin"]) await Store.insert("recipes", { title, ingredients: ["Un"], steps: "", emoji: "🥟", photo_path: null });
+  });
+  await sg.p.reload(); await sg.p.waitForSelector(".slot");
+  await sg.p.click("#suggest-btn"); await sg.p.waitForSelector(".sheet.open .sugg-card");
+  let cards = await sg.p.$$eval(".sheet .sugg-card", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
+  assert.strictEqual(cards.length, 3, cards.join(" | "));
+  assert.match(cards[0], /Chuchvara.*hali pishirilmagan/);
+  assert.match(cards[2], /Norin/);
+  await sg.p.click(".sheet [data-more]"); await sg.p.waitForTimeout(200);
+  cards = await sg.p.$$eval(".sheet .sugg-card", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
+  assert.match(cards[0], /Manti.*oxirgi marta 3 kun oldin/, cards.join(" | ")); // demo seed planned Manti 3 days ago
+  await sg.p.locator(".sheet .sugg-card", { hasText: "Manti" }).click();
+  await sg.p.waitForSelector('.sheet.open [data-slot="tushlik"]'); await sg.p.click('.sheet [data-slot="tushlik"]'); await sg.p.waitForTimeout(600);
+  const t2 = await today(sg.p);
+  assert.strictEqual(await sg.p.evaluate(async (d) => (await Store.list("meals")).filter((m) => m.day_date === d && m.slot === "tushlik" && m.title === "Manti").length, t2), 1);
+  // nothing to suggest → empty state with a "Retsept qo'shish" button
+  await sg.p.evaluate(async () => {
+    for (const m of await Store.list("meals")) await Store.remove("meals", m.id);
+    for (const r of await Store.list("recipes")) await Store.remove("recipes", r.id);
+  });
+  await sg.p.reload(); await sg.p.waitForSelector(".slot");
+  await sg.p.click("#suggest-btn"); await sg.p.waitForSelector(".sheet.open [data-suggest-add]");
+  await sg.p.click(".sheet [data-suggest-add]"); await sg.p.waitForSelector(".sheet.open #r-title");
+  assert.deepEqual(sg.errors, []);
+
+  console.log("PASS recipes.spec: recipes and suggestions");
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });
