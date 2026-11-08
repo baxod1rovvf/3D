@@ -62,11 +62,54 @@
   .pick { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 2px solid var(--line); min-height: 56px; font-weight: 700; }
   .pick input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
   .pick .st { margin-left: auto; }
+  /* ---------- 📖 Retseptlar ---------- */
+  .tabs2 { margin-top: 4px; }
+  .recipes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 14px; }
+  .recipe-card { display: flex; flex-direction: column; overflow: hidden; padding: 0; border: 2px solid var(--line); border-radius: 22px; background: var(--surface); text-align: left; color: var(--ink); box-shadow: var(--shadow); }
+  .recipe-card .ph { aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--accent-soft); font-size: 54px; }
+  .recipe-card .ph img { width: 100%; height: 100%; object-fit: cover; }
+  .recipe-card .tx { padding: 10px 12px 12px; }
+  .recipe-card .tt { font-family: var(--display); font-weight: 600; font-size: 16px; line-height: 1.2; }
+  .recipe-card .mt { font-size: 12.5px; color: var(--muted); font-weight: 700; margin-top: 2px; }
+  .recipe-add { width: 100%; margin-top: 14px; min-height: 52px; }
+  .recipe-detail .hero { margin: 0 -16px 12px; aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--accent-soft); font-size: 80px; }
+  .recipe-detail .hero img { width: 100%; height: 100%; object-fit: cover; }
+  .recipe-detail h2 { margin: 0 0 8px; font-family: var(--display); font-size: 24px; }
+  .recipe-detail .steps { white-space: pre-wrap; line-height: 1.55; color: var(--ink-2); margin: 12px 0 0; }
+  .slot-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .slot-pick button { min-height: 64px; border: 2px solid var(--line); border-radius: 18px; background: var(--surface); font-weight: 800; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--ink); }
+  .slot-pick button .emo { font-size: 24px; }
+  .recipe-empty { margin-top: 24px; }
+  .drop { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; border: 2px dashed var(--accent); border-radius: 22px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; overflow: hidden; text-align: center; font-size: 14px; }
+  .drop img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop .change { position: absolute; right: 10px; bottom: 10px; background: rgba(47,42,37,.8); color: #fff; border-radius: 10px; padding: 6px 10px; font-size: 12.5px; font-weight: 600; pointer-events: none; }
+  /* Categories: a compact tab strip (emoji over a short label) on a tinted rail. */
+  .r-cats { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 6px 16px; background: var(--accent-soft); border-radius: 0; }
+  .r-cats::-webkit-scrollbar { display: none; }
+  .r-cats button { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 72px; min-height: 56px; padding: 6px 8px; border: 0; border-radius: 14px; background: transparent; color: var(--ink-2); font-size: 11.5px; font-weight: 700; line-height: 1.15; white-space: nowrap; }
+  .r-cats button .emo { font-size: 22px; }
+  .r-cats button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 0 var(--accent-ink); }
+  .step-label { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .step-label b { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-fill); color: var(--on-accent); font-size: 11px; }
+  /* Products: a grid of tiles, clearly different from the category strip. */
+  .r-picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .r-picks button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 84px; padding: 8px 4px; border: 2px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); font-size: 12.5px; font-weight: 700; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+  .r-picks button .emo { font-size: 30px; }
+  .r-picks button[aria-pressed="true"] { border-color: var(--accent-ink); background: var(--accent-soft); }
+  .r-picks button[aria-pressed="true"]::after { content: "✓"; position: absolute; top: 4px; right: 6px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-fill); color: var(--on-accent); font-size: 12px; line-height: 20px; }
+  .r-picks button:disabled { opacity: .5; }
+
 </style>
 </head>
 <body>
 <div class="app" data-section="taomlar">
   <main class="main" id="main">
+    <div class="segmented tabs2" role="tablist" aria-label="Taomlar">
+      <button role="tab" data-tab="menu">📅 Menyu</button>
+      <button role="tab" data-tab="recipes">📖 Retseptlar</button>
+    </div>
+    <div id="menu-pane">
     <div class="weeknav">
       <button class="icon-btn" id="prev" aria-label="Oldingi hafta"><i data-lucide="chevron-left"></i></button>
       <span class="label" id="wlabel"></span>
@@ -78,6 +121,8 @@
       <button class="btn ghost" style="flex:1;font-size:14px" id="fav-btn"><i data-lucide="star"></i>Sevimlilar</button>
       <button class="btn ghost" style="flex:1;font-size:14px" id="past-btn"><i data-lucide="history"></i>Avvalgi taomlar</button>
     </div>
+    </div>
+    <div id="recipes-pane" hidden></div>
   </main>
 </div>
 
@@ -95,13 +140,30 @@ function weekStart(s) { const d = App.parseYmd(s); const wd = (d.getDay() + 6) %
 let selected = App.today();
 let meals = [];
 let groceries = [];
+let recipes = [];
+let recipesMissing = false; // the recipes table isn't set up on the server yet
+let recipeUrls = {};
+let tab = new URLSearchParams(location.search).get("tab") === "recipes" ? "recipes" : "menu";
 
 async function render() {
   [meals, groceries] = await Promise.all([Store.list("meals", { order: "created_at", asc: true }), Store.list("grocery_items")]);
+  try { recipes = await Store.list("recipes", { order: "created_at" }); recipesMissing = false; }
+  catch (e) { console.warn("recipes", e); recipes = []; recipesMissing = true; }
+  try { recipeUrls = await Store.photoUrls(recipes.map((r) => r.photo_path)); } catch (e) { recipeUrls = {}; }
   draw();
 }
 
+function setTab(t) {
+  tab = t;
+  $$('[data-tab]').forEach((b) => { const on = b.dataset.tab === t; b.classList.toggle("active", on); b.setAttribute("aria-selected", on); });
+  $("#menu-pane").hidden = t !== "menu";
+  $("#recipes-pane").hidden = t !== "recipes";
+  if (t === "recipes") drawRecipes();
+}
+$$('[data-tab]').forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+
 function draw() {
+  if (tab === "recipes") drawRecipes();
   const start = weekStart(selected);
   const days = Array.from({ length: 7 }, (_, i) => App.addDays(start, i));
   const s = App.parseYmd(days[0]), e = App.parseYmd(days[6]);
@@ -248,6 +310,154 @@ function sendToGrocery(ings, mealTitle) {
   });
 }
 
+/* ---------- 📖 Retseptlar ---------- */
+// A dish emoji from its name; a generic fallback becomes 🍲.
+const dishEmoji = (title) => { const e = Stickers.forName(title || "", "boshqa"); return !title || e === Stickers.forName("", "boshqa") ? "🍲" : e; };
+const RECIPE_CATS = Catalog.CATEGORIES.filter((c) => !["uy", "gigiyena", "dori"].includes(c.id));
+const ingEmoji = (n) => (Catalog.find(n) || {}).emoji || Stickers.forName(n, "boshqa");
+const recipeChip = (g) => `<span class="chip ing"><span class="emo" aria-hidden="true">${ingEmoji(g)}</span>${esc(g)}</span>`;
+
+function drawRecipes() {
+  const pane = $("#recipes-pane");
+  if (recipesMissing) {
+    pane.innerHTML = `<div class="empty recipe-empty"><div class="ico emo" aria-hidden="true">🛠️</div><strong>Retseptlar uchun serverni sozlang</strong><p>Supabase → SQL Editor'da <b>supabase/recipes.sql</b> faylini bir marta ishga tushiring.</p></div>`;
+    return;
+  }
+  pane.innerHTML = `<button class="btn primary recipe-add" id="recipe-add"><i data-lucide="plus"></i>Retsept qo'shish</button>` +
+    (recipes.length ? `<div class="recipes">${recipes.map((r) => `<button class="recipe-card" data-rid="${r.id}">
+        <span class="ph">${recipeUrls[r.photo_path] ? `<img src="${esc(recipeUrls[r.photo_path])}" alt="">` : `<span class="emo" aria-hidden="true">${r.emoji || dishEmoji(r.title)}</span>`}</span>
+        <span class="tx"><span class="tt">${esc(r.title)}</span><span class="mt">${(r.ingredients || []).length} masalliq</span></span></button>`).join("")}</div>`
+      : `<div class="empty recipe-empty"><div class="ico emo" aria-hidden="true">📖</div><strong>Hali retsept yo'q</strong><p>Sevimli taomlaringizni rasm va tayyorlash usuli bilan saqlang.</p></div>`);
+  icons();
+}
+$("#recipes-pane").addEventListener("click", (e) => {
+  if (e.target.closest("#recipe-add")) return openRecipeEditor();
+  const c = e.target.closest("[data-rid]"); if (c) openRecipe(recipes.find((r) => r.id === c.dataset.rid));
+});
+
+/** Put a recipe (or any named dish) on today's menu in the chosen slot. */
+async function addMealToday(src, slot) {
+  const steps = src.steps || "";
+  const row = { title: src.title, day_date: App.today(), slot, description: steps.split("\n")[0].slice(0, 120), ingredients: [...(src.ingredients || [])], notes: steps, favorite: false, created_by: Store.ctx.profile.id };
+  await Store.insert("meals", row);
+  Store.notify("meal_added", { meal: row.title, slot, day: App.WEEKDAYS[App.parseYmd(row.day_date).getDay()], slotName: slotName(slot) }, "taomlar.html");
+  App.toast(`«${row.title}» bugungi ${slotName(slot).toLowerCase()}ga qo'shildi 🍽️`);
+  selected = row.day_date;
+  await render();
+}
+
+/** Choose breakfast / lunch / dinner, then call onPick(slot). */
+function pickSlot(title, onPick) {
+  App.sheet({
+    title: `«${title}» — qachon?`,
+    body: `<div class="slot-pick">${SLOTS.map((sl) => `<button type="button" data-slot="${sl.id}"><span class="emo" aria-hidden="true">${sl.emoji}</span>${sl.name}</button>`).join("")}</div>`,
+    onMount(el, api) {
+      el.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-slot]"); if (!b) return;
+        api.close();
+        try { await onPick(b.dataset.slot); } catch (err) { App.fail(err); }
+      });
+    },
+  });
+}
+
+function openRecipe(r) {
+  if (!r) return;
+  App.sheet({
+    title: "Retsept 📖",
+    body: `<div class="recipe-detail">
+        <div class="hero">${recipeUrls[r.photo_path] ? `<img src="${esc(recipeUrls[r.photo_path])}" alt="${esc(r.title)}">` : `<span class="emo" aria-hidden="true">${r.emoji || dishEmoji(r.title)}</span>`}</div>
+        <h2>${esc(r.title)}</h2>
+        ${(r.ingredients || []).length ? `<div class="ings">${r.ingredients.map(recipeChip).join("")}</div>` : ""}
+        ${r.steps ? `<p class="steps">${esc(r.steps)}</p>` : ""}
+        <button class="btn primary block" data-today style="margin-top:16px"><i data-lucide="calendar-plus"></i>Bugungi menyuga qo'shish</button>
+        ${(r.ingredients || []).length ? `<button class="btn ghost block" data-to-grocery style="margin-top:10px"><i data-lucide="shopping-basket"></i>Masalliqlarni Ro'zg'orga</button>` : ""}
+      </div>`,
+    foot: `<button class="btn danger" data-del-recipe aria-label="Retseptni o'chirish"><i data-lucide="trash-2"></i></button><button class="btn ghost" data-edit-recipe><i data-lucide="pencil"></i>Tahrirlash</button>`,
+    onMount(el, api) {
+      $("[data-today]", el).addEventListener("click", () => { api.close(); setTimeout(() => pickSlot(r.title, (slot) => addMealToday(r, slot)), 300); });
+      const g = $("[data-to-grocery]", el);
+      if (g) g.addEventListener("click", () => { api.close(); setTimeout(() => sendToGrocery(r.ingredients, r.title), 300); });
+      $("[data-edit-recipe]", el).addEventListener("click", () => { api.close(); setTimeout(() => openRecipeEditor(r), 300); });
+      $("[data-del-recipe]", el).addEventListener("click", async () => {
+        api.close();
+        if (!(await App.confirm(`«${r.title}» retsepti o'chiriladi.`, "Retseptni o'chirish"))) return;
+        try {
+          await Store.remove("recipes", r.id);
+          await render();
+          App.undoToast(`«${r.title}» o'chirildi`, async () => {
+            const { id, household_id, ...row } = r;
+            try { await Store.insert("recipes", row); await render(); } catch (e2) { App.fail(e2); }
+          }, "trash-2");
+        } catch (e) { App.fail(e); }
+      });
+    },
+  });
+}
+
+function openRecipeEditor(r) {
+  const isNew = !r;
+  const it = r || { title: "", ingredients: [], steps: "", photo_path: null };
+  let cat = RECIPE_CATS[0].id, blob = null;
+  const norm = (n) => Stickers.normalize(n);
+  App.sheet({
+    title: isNew ? "Yangi retsept 📖" : "Retseptni tahrirlash ✏️",
+    body: `<form id="rform" novalidate>
+      <div class="field"><span class="label">Rasm</span>
+        <label class="drop" id="r-drop">${recipeUrls[it.photo_path] ? `<img src="${esc(recipeUrls[it.photo_path])}" alt=""><span class="change">Almashtirish</span>` : `<span><span class="emo" style="font-size:30px" aria-hidden="true">📷</span><br>Rasm tanlash</span>`}
+          <input type="file" accept="image/*" id="r-file" aria-label="Rasm tanlash"></label></div>
+      <div class="field"><label for="r-title">Taom nomi</label><input class="input" id="r-title" value="${esc(it.title)}" maxlength="60" autocomplete="off" placeholder="masalan, Osh"><span class="error-text" hidden id="r-err">Taom nomini yozing</span></div>
+      <div class="field"><label for="r-ings">Masalliqlar</label><input class="input" id="r-ings" value="${esc((it.ingredients || []).join(", "))}" autocomplete="off" placeholder="pastdan tanlang yoki yozing, vergul bilan">
+        <div class="r-cats" id="r-cats" role="group" aria-label="Turkum" style="margin-top:10px"></div>
+        <div class="r-picks" id="r-picks" role="group" aria-label="Masalliqlar" style="margin-top:10px"></div></div>
+      <div class="field"><label for="r-steps">Tayyorlash</label><textarea class="textarea" id="r-steps" rows="6" maxlength="4000" placeholder="1. ...">${esc(it.steps || "")}</textarea></div>
+    </form>`,
+    foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn primary" data-save>${isNew ? "Saqlash" : "O'zgarishlarni saqlash"}</button>`,
+    onMount(el, api) {
+      const ingIn = $("#r-ings", el);
+      const names = () => ingIn.value.split(",").map((x) => x.trim()).filter(Boolean);
+      const has = (n) => names().some((x) => norm(x) === norm(n));
+      const drawCats = () => { $("#r-cats", el).innerHTML = RECIPE_CATS.map((c) => `<button type="button" data-rcat="${c.id}" aria-pressed="${c.id === cat}"><span class="emo" aria-hidden="true">${c.emoji}</span>${esc(c.name)}</button>`).join(""); };
+      const drawPicks = () => { $("#r-picks", el).innerHTML = Catalog.category(cat).products.map((x) => `<button type="button" data-rpick="${esc(x.name)}" aria-pressed="${has(x.name)}"><span class="emo" aria-hidden="true">${x.emoji}</span>${esc(x.name)}</button>`).join(""); };
+      drawCats(); drawPicks();
+      $("#r-cats", el).addEventListener("click", (e) => { const b = e.target.closest("[data-rcat]"); if (!b) return; cat = b.dataset.rcat; drawCats(); drawPicks(); });
+      $("#r-picks", el).addEventListener("click", (e) => {
+        const b = e.target.closest("[data-rpick]"); if (!b) return;
+        const n = b.dataset.rpick, list = names();
+        ingIn.value = (has(n) ? list.filter((x) => norm(x) !== norm(n)) : list.concat(n)).join(", ");
+        drawPicks();
+      });
+      ingIn.addEventListener("input", drawPicks);
+      $("#r-title", el).addEventListener("input", () => ($("#r-err", el).hidden = true));
+      $("#r-file", el).addEventListener("change", async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        try { blob = await Store.compressImage(file, Store.mode === "demo" ? 900 : 1600, Store.mode === "demo" ? 0.72 : 0.85); }
+        catch (err) { blob = null; return App.toast("Bu rasmni ochib bo'lmadi. Boshqa rasm tanlang.", "image-off"); }
+        const drop = $("#r-drop", el);
+        drop.querySelectorAll("img, span").forEach((n) => n.remove());
+        drop.insertAdjacentHTML("afterbegin", `<img src="${URL.createObjectURL(blob)}" alt=""><span class="change">Almashtirish</span>`);
+      });
+      $("[data-save]", el).addEventListener("click", async () => {
+        const title = $("#r-title", el).value.trim();
+        if (!title) { $("#r-err", el).hidden = false; $("#r-title", el).focus(); return; }
+        const btn = $("[data-save]", el); btn.disabled = true; btn.textContent = blob ? "Rasm yuklanmoqda…" : "Saqlanmoqda…";
+        const v = { title, ingredients: names(), steps: $("#r-steps", el).value.trim(), emoji: dishEmoji(title), updated_at: new Date().toISOString() };
+        let photoLost = false;
+        if (blob) {
+          try { v.photo_path = await Store.uploadPhoto(blob); if (!isNew && it.photo_path) Store.removePhoto(it.photo_path); }
+          catch (err) { console.warn("photo", err); photoLost = true; }
+        }
+        try {
+          if (isNew) await Store.insert("recipes", { ...v, photo_path: v.photo_path || null, created_by: Store.ctx.profile.id });
+          else await Store.update("recipes", it.id, v);
+          api.close(); await render();
+          App.toast(photoLost ? "Rasm yuklanmadi — retsept rasmsiz saqlandi" : isNew ? `«${title}» retsepti saqlandi 📖` : "Saqlandi", photoLost ? "image-off" : "check");
+        } catch (err) { App.fail(err); btn.disabled = false; btn.textContent = "Saqlash"; }
+      });
+    },
+  });
+}
+
 /* ---------- favorites & past meals ---------- */
 function uniqueMeals(list) {
   const seen = new Map();
@@ -277,7 +487,8 @@ $("#fav-btn").addEventListener("click", () => openLibrary("fav"));
 $("#past-btn").addEventListener("click", () => openLibrary("past"));
 
 draw();
-App.boot({ page: "taomlar", title: "Taomlar", emoji: "🍲", sub: "Haftalik oilaviy reja", tables: ["meals", "grocery_items"], render }).then(() => {
+setTab(tab);
+App.boot({ page: "taomlar", title: "Taomlar", emoji: "🍲", sub: "Haftalik oilaviy reja", tables: ["meals", "grocery_items", "recipes"], render }).then(() => {
   if (new URLSearchParams(location.search).get("new")) openEditor();
 });
 </script>
