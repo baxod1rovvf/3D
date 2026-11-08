@@ -15,8 +15,8 @@ A code works once and expires after 10 minutes. If it expires, tap **Yangi kod o
 | File | Section |
 |---|---|
 | `index.html` | Bosh sahifa: greeting, today's overview, quick actions, recent activity |
-| `rozgor.html` | Ro'zg'or: tap **X** when something runs out, then **✓** when it's bought (Kerak / Xarid qilindi / history) |
-| `taomlar.html` | Taomlar menyusi: 7-day planner (nonushta / tushlik / kechki), favourites, past meals, *send ingredients to Ro'zg'or* |
+| `rozgor.html` | Ro'zg'or: tap **X** when something runs out, then **✓** when it's bought (Kerak / Olindi / 🎁 Xohishlar). 10 categories incl. 💊 Dorilar with an "Agar u yo'q bo'lsa…" replacement |
+| `taomlar.html` | Taomlar: 📅 Menyu (7-day planner, favourites, past meals, *send ingredients to Ro'zg'or*, 🤔 "Bugun nima pishiramiz?" suggestions) and 📖 Retseptlar (photo, ingredients with emojis, steps) |
 | `xotiralar.html` | Oilaviy xotiralar: private photo timeline and gallery |
 | `uy-ishlari.html` | Uy ishlari: today / upcoming / completed, assignee, priority, reminders |
 | `kirish.html` | First-time setup, entering a pairing code, and "whose phone is this?" |
@@ -30,6 +30,7 @@ Do these steps in this order.
 1. **Create the project.** In [supabase.com](https://supabase.com), create a new project. The free plan is enough.
 2. **Connect the site.** Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into `js/config.js` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
 3. **Run the SQL.** Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, and press **Run**. (If you already ran an older `schema.sql`, you can paste just the missing parts instead: `supabase/pairing.sql` for Qurilmani ulash / Menda kod bor, and `supabase/push.sql` for notifications and meal reminders.) It is safe to re-run. It adds the notification columns, the settings tables, pairing, the push trigger and the 5-minute meal timer. Supabase may ask to enable the `pg_net` and `pg_cron` extensions. The SQL enables them itself. If it says they are unavailable, enable them in **Database → Extensions** and run it again.
+   - **Recipes (📖 Retseptlar)** need the `recipes` table: run the whole `schema.sql`, or just `supabase/recipes.sql`. Until then the Recipes tab says so and everything else works.
    - `schema.sql` calls this project's push function at a fixed address: `https://anmpvewqxvvwzwewnlum.supabase.co/functions/v1/push` (twice: the notifications trigger and the meal timer). **If you use another Supabase project, replace that address with `https://<your-project>.supabase.co/functions/v1/push` before running it.**
 4. **Deploy the push function.**
    1. Open **Edge Functions → Deploy a new function → Via Editor**.
