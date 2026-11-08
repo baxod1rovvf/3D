@@ -48,6 +48,13 @@
       p("Bolalar shampuni", "🛁"), p("Bolalar sovuni", "🧼"), p("Bolalar kukuni (prisipka)", "👶"),
       p("Bolalar ovqati (smes)", "🍼"), p("So'rg'ich", "🍼"), p("Bolalar shishasi", "🍼"),
     ] },
+    { id: "dori", name: "Dorilar", emoji: "💊", products: [
+      p("Paratsetamol", "💊"), p("Ibuprofen", "💊"), p("Analgin", "💊"), p("Sitramon", "💊"), p("No-shpa", "💊"),
+      p("Aspirin", "💊"), p("Validol", "🫀"), p("Korvalol", "💧"), p("Smekta", "🫙"), p("Aktivlangan ko'mir", "⚫"),
+      p("Mezim", "💊"), p("Loratadin", "🤧"), p("Suprastin", "🤧"), p("Bint", "🩹"), p("Yod", "🧪"),
+      p("Brilliant yashil", "🟢"), p("Gidroperit", "🫧"), p("Termometr", "🌡️"), p("Burun tomchisi", "👃"),
+      p("Yo'tal siropi", "🍯"),
+    ] },
     { id: "boshqa", name: "Boshqalar", emoji: "🛒", products: [
       p("Shakar", "🍬"), p("Tuz", "🧂"), p("O'simlik yog'i", "🫒"), p("Ziravorlar", "🌶️"), p("Asal", "🍯"),
       p("Murabbo", "🍓"), p("Ketchup", "🍅"), p("Mayonez", "🥫"), p("Konserva", "🥫"), p("Shokolad", "🍫"),
@@ -80,6 +87,8 @@
     GIFTS,
     /** The catalogue entry for an exact product name (any case/apostrophe), or null. */
     find: (name) => byName.get(norm(name)) || null,
+    /** True for the catalogue's Dorilar products (any case / apostrophe). */
+    isMedicine: (name) => { const x = byName.get(norm(name)); return !!x && x.category === "dori"; },
     category: (id) => CATEGORIES.find((c) => c.id === id) || CATEGORIES[CATEGORIES.length - 1],
   };
 })(globalThis);
