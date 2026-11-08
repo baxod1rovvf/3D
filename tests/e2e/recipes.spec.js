@@ -27,12 +27,10 @@ const today = (p) => p.evaluate(() => App.today());
 
   // ---- Recipes: add with photo + ingredient tiles, open, add to today's menu, edit, delete + undo
   const { p, errors } = await setup(browser);
-  await p.goto(BASE + "/taomlar.html"); await p.waitForSelector(".slot");
-  assert.ok(await p.isVisible('[data-tab="menu"]') && await p.isVisible('[data-tab="recipes"]'), "two tabs");
-  assert.match(await p.textContent('[data-tab="menu"]'), /📅 Menyu/);
-  assert.match(await p.textContent('[data-tab="recipes"]'), /📖 Retseptlar/);
-  await p.click('[data-tab="recipes"]');
-  await p.waitForSelector("#recipe-add");
+  await p.goto(BASE + "/taomlar.html"); await p.waitForSelector("#recipe-add");
+  assert.match(await p.textContent("#suggest-btn"), /Bugun nima pishiramiz\?/);
+  assert.strictEqual(await p.locator(".slot, .weeknav, [data-tab]").count(), 0, "calendar and tabs are gone");
+  assert.match(await p.textContent("#recipe-add"), /Taom qo'shish/);
   await p.click("#recipe-add"); await p.waitForSelector(".sheet.open #r-title");
   await p.setInputFiles("#r-file", PHOTO);
   await p.fill("#r-title", "Mastava");
@@ -44,7 +42,7 @@ const today = (p) => p.evaluate(() => App.today());
   await p.click(".sheet [data-save]"); await p.waitForTimeout(700);
   const card = p.locator(".recipe-card", { hasText: "Mastava" });
   assert.strictEqual(await card.count(), 1);
-  assert.match(await card.textContent(), /3 masalliq/);
+  assert.match(await card.textContent(), /3 masalliq · hali pishirilmagan/);
   assert.ok(await card.locator("img").count() === 1, "card shows the photo");
 
   await card.click(); await p.waitForSelector(".sheet.open .recipe-detail");
@@ -57,9 +55,10 @@ const today = (p) => p.evaluate(() => App.today());
   const added = await p.evaluate(async (d) => (await Store.list("meals")).filter((m) => m.day_date === d && m.slot === "kechki" && m.title === "Mastava"), t);
   assert.strictEqual(added.length, 1, "added to today's dinner");
   assert.deepStrictEqual(added[0].ingredients, ["Tovuq", "Kartoshka", "Sabzi"]);
+  await p.waitForSelector("#today-strip .chip:has-text('Mastava')");
+  assert.match(await p.locator(".recipe-card", { hasText: "Mastava" }).textContent(), /bugun/);
 
   // edit the title
-  await p.click('[data-tab="recipes"]');
   await p.locator(".recipe-card", { hasText: "Mastava" }).click(); await p.waitForSelector(".sheet.open .recipe-detail");
   await p.click(".sheet [data-edit-recipe]"); await p.waitForSelector(".sheet.open #r-title");
   await p.fill("#r-title", "Mastava (qo'y go'shtli)"); await p.click(".sheet [data-save]"); await p.waitForTimeout(600);
@@ -82,11 +81,10 @@ const today = (p) => p.evaluate(() => App.today());
       s = v;
     } });
   });
-  await missing.p.goto(BASE + "/taomlar.html"); await missing.p.waitForSelector(".slot");
-  await missing.p.click('[data-tab="recipes"]');
+  await missing.p.goto(BASE + "/taomlar.html");
   await missing.p.waitForSelector("text=Retseptlar uchun serverni sozlang");
-  await missing.p.click('[data-tab="menu"]');
-  assert.ok(await missing.p.isVisible(".slot"), "the menu still works");
+  assert.ok(await missing.p.isVisible("#today-strip .chip"), "today's meals still show");
+  await missing.p.click("#suggest-btn"); await missing.p.waitForSelector(".sheet.open .sugg-card");
   assert.deepEqual(missing.errors, []);
 
   // ---- Review focus: photo upload fails → recipe saved without a photo, with a toast
@@ -94,7 +92,7 @@ const today = (p) => p.evaluate(() => App.today());
     let s;
     Object.defineProperty(window, "Store", { configurable: true, get: () => s, set(v) { v.uploadPhoto = () => Promise.reject(new Error("upload failed")); s = v; } });
   });
-  await noPhoto.p.goto(BASE + "/taomlar.html?tab=recipes"); await noPhoto.p.waitForSelector("#recipe-add");
+  await noPhoto.p.goto(BASE + "/taomlar.html"); await noPhoto.p.waitForSelector("#recipe-add");
   await noPhoto.p.click("#recipe-add"); await noPhoto.p.waitForSelector(".sheet.open #r-title");
   await noPhoto.p.setInputFiles("#r-file", PHOTO);
   await noPhoto.p.fill("#r-title", "Manti"); await noPhoto.p.waitForTimeout(300);
@@ -106,11 +104,11 @@ const today = (p) => p.evaluate(() => App.today());
 
   // ---- "Bugun nima pishiramiz?": 3 suggestions, next page, add to today, empty state
   const sg = await setup(browser);
-  await sg.p.goto(BASE + "/taomlar.html"); await sg.p.waitForSelector(".slot");
+  await sg.p.goto(BASE + "/taomlar.html"); await sg.p.waitForSelector("#recipe-add");
   await sg.p.evaluate(async () => {
     for (const title of ["Chuchvara", "Dimlama", "Norin"]) await Store.insert("recipes", { title, ingredients: ["Un"], steps: "", emoji: "🥟", photo_path: null });
   });
-  await sg.p.reload(); await sg.p.waitForSelector(".slot");
+  await sg.p.reload(); await sg.p.waitForSelector("#recipe-add");
   await sg.p.click("#suggest-btn"); await sg.p.waitForSelector(".sheet.open .sugg-card");
   let cards = await sg.p.$$eval(".sheet .sugg-card", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
   assert.strictEqual(cards.length, 3, cards.join(" | "));
@@ -123,12 +121,12 @@ const today = (p) => p.evaluate(() => App.today());
   await sg.p.waitForSelector('.sheet.open [data-slot="tushlik"]'); await sg.p.click('.sheet [data-slot="tushlik"]'); await sg.p.waitForTimeout(600);
   const t2 = await today(sg.p);
   assert.strictEqual(await sg.p.evaluate(async (d) => (await Store.list("meals")).filter((m) => m.day_date === d && m.slot === "tushlik" && m.title === "Manti").length, t2), 1);
-  // nothing to suggest → empty state with a "Retsept qo'shish" button
+  // nothing to suggest → empty state with a "Taom qo'shish" button
   await sg.p.evaluate(async () => {
     for (const m of await Store.list("meals")) await Store.remove("meals", m.id);
     for (const r of await Store.list("recipes")) await Store.remove("recipes", r.id);
   });
-  await sg.p.reload(); await sg.p.waitForSelector(".slot");
+  await sg.p.reload(); await sg.p.waitForSelector("#recipe-add");
   await sg.p.click("#suggest-btn"); await sg.p.waitForSelector(".sheet.open [data-suggest-add]");
   await sg.p.click(".sheet [data-suggest-add]"); await sg.p.waitForSelector(".sheet.open #r-title");
   assert.deepEqual(sg.errors, []);

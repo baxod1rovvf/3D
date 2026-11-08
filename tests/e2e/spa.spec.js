@@ -20,7 +20,7 @@ const LUCIDE = process.env.LUCIDE_PATH || "/tmp/claude-0/-home-user-3D/600534e3-
   await p.evaluate(() => { window.__sameDocument = true; });
   await p.waitForTimeout(800); // background prefetch of the other sections
 
-  const ready = { "rozgor.html": ".g-row", "taomlar.html": ".slot", "xotiralar.html": ".mem, #content .empty", "uy-ishlari.html": ".task, #list .empty", "index.html": "#overview .ov" };
+  const ready = { "rozgor.html": ".g-row", "taomlar.html": "#suggest-btn", "xotiralar.html": ".mem, #content .empty", "uy-ishlari.html": ".task, #list .empty", "index.html": "#overview .ov" };
   for (const round of [1, 2]) {
     for (const [href, sel] of Object.entries(ready)) {
       const t0 = Date.now();

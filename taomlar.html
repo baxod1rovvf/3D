@@ -64,7 +64,6 @@
   .pick input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
   .pick .st { margin-left: auto; }
   /* ---------- 📖 Retseptlar ---------- */
-  .tabs2 { margin-top: 4px; }
   .recipes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 14px; }
   .recipe-card { display: flex; flex-direction: column; overflow: hidden; padding: 0; border: 2px solid var(--line); border-radius: 22px; background: var(--surface); text-align: left; color: var(--ink); box-shadow: var(--shadow); }
   .recipe-card .ph { aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--accent-soft); font-size: 54px; }
@@ -81,7 +80,16 @@
   .slot-pick button { min-height: 64px; border: 2px solid var(--line); border-radius: 18px; background: var(--surface); font-weight: 800; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--ink); }
   .slot-pick button .emo { font-size: 24px; }
   .recipe-empty { margin-top: 24px; }
-  .suggest-btn { margin: 12px 0 4px; min-height: 52px; font-size: 16px; }
+  .suggest-hero { display: flex; align-items: center; gap: 14px; width: 100%; margin-top: 10px; padding: 18px 16px; border: 0; border-radius: 26px; text-align: left;
+    background: linear-gradient(135deg, var(--accent) 0%, #FF9A6B 100%); color: #2B2440; box-shadow: 0 5px 0 var(--accent-deep); }
+  .suggest-hero:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-deep); }
+  .suggest-hero .big { font-size: 46px; line-height: 1; }
+  .suggest-hero b { display: block; font-family: var(--display); font-size: 22px; line-height: 1.15; }
+  .suggest-hero small { display: block; margin-top: 4px; font-size: 13.5px; font-weight: 700; opacity: .85; }
+  .today-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding: 12px; border-radius: 20px; background: var(--accent-soft); }
+  .today-strip .lbl { width: 100%; font-size: 13px; font-weight: 800; color: var(--accent-ink); }
+  .today-strip .chip { padding: 6px 6px 6px 12px; font-size: 14px; }
+  .today-strip .chip button { border: 0; background: none; color: var(--muted); padding: 0 4px; min-width: 28px; min-height: 28px; }
   .sugg-card { display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 10px; padding: 10px; border: 2px solid var(--line); border-radius: 20px; background: var(--surface); text-align: left; color: var(--ink); }
   .sugg-card .ph { width: 64px; height: 64px; flex: none; border-radius: 16px; overflow: hidden; display: grid; place-items: center; background: var(--accent-soft); font-size: 34px; }
   .sugg-card .ph img { width: 100%; height: 100%; object-fit: cover; }
@@ -112,25 +120,10 @@
 <body>
 <div class="app" data-section="taomlar">
   <main class="main" id="main">
-    <div class="segmented tabs2" role="tablist" aria-label="Taomlar">
-      <button role="tab" data-tab="menu">📅 Menyu</button>
-      <button role="tab" data-tab="recipes">📖 Retseptlar</button>
-    </div>
-    <div id="menu-pane">
-    <button class="btn accent block suggest-btn" id="suggest-btn"><span class="emo" aria-hidden="true">🤔</span> Bugun nima pishiramiz?</button>
-    <div class="weeknav">
-      <button class="icon-btn" id="prev" aria-label="Oldingi hafta"><i data-lucide="chevron-left"></i></button>
-      <span class="label" id="wlabel"></span>
-      <button class="icon-btn" id="next" aria-label="Keyingi hafta"><i data-lucide="chevron-right"></i></button>
-    </div>
-    <div class="days" id="days" role="tablist" aria-label="Hafta kunlari"></div>
-    <div id="slots"></div>
-    <div class="bar" style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn ghost" style="flex:1;font-size:14px" id="fav-btn"><i data-lucide="star"></i>Sevimlilar</button>
-      <button class="btn ghost" style="flex:1;font-size:14px" id="past-btn"><i data-lucide="history"></i>Avvalgi taomlar</button>
-    </div>
-    </div>
-    <div id="recipes-pane" hidden></div>
+    <button class="suggest-hero" id="suggest-btn"><span class="emo big" aria-hidden="true">🤔</span><span><b>Bugun nima pishiramiz?</b><small>Ko'pdan beri pishirilmagan 3 ta taomni taklif qilaman</small></span></button>
+    <div id="today-strip"></div>
+    <div class="section-head" style="margin-top:20px"><h2>Taomlarimiz 📖</h2></div>
+    <div id="recipes-pane"></div>
   </main>
 </div>
 
@@ -142,150 +135,46 @@ const SLOTS = [
   { id: "kechki", name: "Kechki ovqat", emoji: "🌙", bg: "#E8E6FF" },
 ];
 const slotName = (id) => (SLOTS.find((s) => s.id === id) || {}).name;
-const ingChip = (g, extra = "") => `<span class="chip ing"><span class="emo" aria-hidden="true">${Stickers.forName(g, "boshqa")}</span>${esc(g)}${extra}</span>`;
 
-function weekStart(s) { const d = App.parseYmd(s); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return App.ymd(d); }
-let selected = App.today();
 let meals = [];
 let groceries = [];
 let recipes = [];
 let recipesMissing = false; // the recipes table isn't set up on the server yet
 let recipeUrls = {};
-let tab = new URLSearchParams(location.search).get("tab") === "recipes" ? "recipes" : "menu";
 
 async function render() {
   [meals, groceries] = await Promise.all([Store.list("meals", { order: "created_at", asc: true }), Store.list("grocery_items")]);
   try { recipes = await Store.list("recipes", { order: "created_at" }); recipesMissing = false; }
   catch (e) { console.warn("recipes", e); recipes = []; recipesMissing = true; }
   try { recipeUrls = await Store.photoUrls(recipes.map((r) => r.photo_path)); } catch (e) { recipeUrls = {}; }
-  draw();
+  drawToday();
+  drawRecipes();
 }
 
-function setTab(t) {
-  tab = t;
-  $$('[data-tab]').forEach((b) => { const on = b.dataset.tab === t; b.classList.toggle("active", on); b.setAttribute("aria-selected", on); });
-  $("#menu-pane").hidden = t !== "menu";
-  $("#recipes-pane").hidden = t !== "recipes";
-  if (t === "recipes") drawRecipes();
+// What's being cooked today (recorded from a suggestion or "Bugun shu pishiriladi").
+function drawToday() {
+  const t = App.today();
+  const list = meals.filter((m) => m.day_date === t);
+  $("#today-strip").innerHTML = list.length ? `<div class="today-strip"><span class="lbl">Bugun pishiriladi 🍳</span>${list.map((m) => `<span class="chip ing"><span class="emo" aria-hidden="true">${dishEmoji(m.title)}</span>${esc(m.title)} · ${esc(slotName(m.slot) || "")}<button type="button" data-unplan="${m.id}" aria-label="${esc(m.title)}ni bugundan olib tashlash">✕</button></span>`).join("")}</div>` : "";
 }
-$$('[data-tab]').forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
-
-function draw() {
-  if (tab === "recipes") drawRecipes();
-  const start = weekStart(selected);
-  const days = Array.from({ length: 7 }, (_, i) => App.addDays(start, i));
-  const s = App.parseYmd(days[0]), e = App.parseYmd(days[6]);
-  $("#wlabel").textContent = start === weekStart(App.today()) ? "Shu hafta" : `${s.getDate()}-${App.MONTHS[s.getMonth()]} – ${e.getDate()}-${App.MONTHS[e.getMonth()]}`;
-  $("#days").innerHTML = days.map((d) => {
-    const dt = App.parseYmd(d);
-    const filled = SLOTS.map((sl) => meals.some((m) => m.day_date === d && m.slot === sl.id));
-    return `<button class="day ${d === selected ? "active" : ""} ${d === App.today() ? "today" : ""}" data-d="${d}" role="tab" aria-selected="${d === selected}" aria-label="${App.WEEKDAYS[dt.getDay()]}, ${dt.getDate()}-${App.MONTHS[dt.getMonth()]}">
-      <span class="wd">${App.WEEKDAYS_SHORT[dt.getDay()]}</span><span class="dn">${dt.getDate()}</span>
-      <span class="dots">${filled.map((f) => `<i class="${f ? "f" : ""}"></i>`).join("")}</span></button>`;
-  }).join("");
-
-  const dt = App.parseYmd(selected);
-  $("#slots").innerHTML = `<div class="section-head" style="margin-top:18px"><h2>${App.fmtShort(selected) === "Bugun" ? "Bugun · " : ""}${App.WEEKDAYS[dt.getDay()]}, ${dt.getDate()}-${App.MONTHS[dt.getMonth()]} <span class="emo" aria-hidden="true">🍽️</span></h2></div>` +
-    SLOTS.map((sl) => {
-      const list = meals.filter((m) => m.day_date === selected && m.slot === sl.id);
-      return `<div class="card slot">
-        <div class="slot-h"><span class="si emo" style="background:${sl.bg}" aria-hidden="true">${sl.emoji}</span><span class="sl">${sl.name}</span></div>
-        ${list.map((m) => `<div class="meal" data-id="${m.id}" role="button" tabindex="0">
-          <h4>${esc(m.title)}${m.favorite ? `<i data-lucide="star"></i>` : ""}</h4>
-          ${m.description ? `<p>${esc(m.description)}</p>` : ""}
-          ${m.ingredients && m.ingredients.length ? `<div class="ings">${m.ingredients.map((g) => ingChip(g)).join("")}</div>` : ""}
-        </div>`).join("")}
-        ${list.length ? "" : `<button class="add-slot" data-add="${sl.id}"><i data-lucide="plus"></i>${sl.name} qo'shish</button>`}
-      </div>`;
-    }).join("");
-  icons();
-}
-
-$("#days").addEventListener("click", (e) => { const b = e.target.closest(".day"); if (b) { selected = b.dataset.d; draw(); } });
-$("#prev").addEventListener("click", () => { selected = App.addDays(selected, -7); draw(); });
-$("#next").addEventListener("click", () => { selected = App.addDays(selected, 7); draw(); });
-$("#slots").addEventListener("click", (e) => {
-  const a = e.target.closest("[data-add]"); if (a) return openEditor(null, { slot: a.dataset.add });
-  const m = e.target.closest(".meal"); if (m) openEditor(meals.find((x) => x.id === m.dataset.id));
+$("#today-strip").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-unplan]"); if (!b) return;
+  const m = meals.find((x) => x.id === b.dataset.unplan); if (!m) return;
+  try {
+    await Store.remove("meals", m.id); await render();
+    App.undoToast(`«${m.title}» bugundan olib tashlandi`, async () => {
+      const { id, household_id, ...row } = m;
+      try { await Store.insert("meals", row); await render(); } catch (e2) { App.fail(e2); }
+    }, "undo-2");
+  } catch (err) { App.fail(err); }
 });
-$("#slots").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("meal")) e.target.click(); });
 
-/* ---------- editor ---------- */
-function openEditor(meal, preset = {}) {
-  const isNew = !meal;
-  const m = meal || { title: "", description: "", ingredients: [], notes: "", favorite: false, slot: preset.slot || "kechki", day_date: selected, ...preset };
-  let ings = [...(m.ingredients || [])];
-  App.sheet({
-    title: isNew ? "Nima pishiramiz? 🍲" : "Taom 🍽️",
-    body: `<form id="mform" novalidate>
-      <div class="field"><label for="m-title">Taom nomi</label><input class="input" id="m-title" name="title" value="${esc(m.title)}" autocomplete="off" ${isNew ? "autofocus" : ""} maxlength="60" list="known"><span class="error-text" hidden id="m-err">Taom nomini yozing</span>
-        <datalist id="known">${[...new Set(meals.map((x) => x.title))].map((t) => `<option value="${esc(t)}">`).join("")}</datalist></div>
-      <div class="field-row">
-        <div class="field"><label for="m-day">Kun</label><input class="input" type="date" id="m-day" name="day_date" value="${m.day_date}"></div>
-        <div class="field"><label for="m-slot">Vaqti</label><select class="select" id="m-slot" name="slot">${SLOTS.map((s) => `<option value="${s.id}" ${s.id === m.slot ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>
-      </div>
-      <div class="field"><label for="m-desc">Tavsif</label><input class="input" id="m-desc" name="description" value="${esc(m.description)}" maxlength="120"></div>
-      <div class="field"><span class="label">Masalliqlar</span>
-        <div class="ing-edit" id="ing-list"></div>
-        <div class="ing-add"><input class="input" id="ing-in" placeholder="masalan, Kartoshka" aria-label="Masalliq nomi" maxlength="40"><button type="button" class="btn ghost" id="ing-add" aria-label="Masalliq qo'shish"><i data-lucide="plus"></i></button></div>
-      </div>
-      <div class="field"><label for="m-notes">Tayyorlash bo'yicha izoh</label><textarea class="textarea" id="m-notes" name="notes" maxlength="500">${esc(m.notes)}</textarea></div>
-      <label class="switch"><span><b style="font-weight:600">Sevimli taom</b><br><span class="hint">Keyin bir bosishda qayta rejalashtirish uchun</span></span><input type="checkbox" name="favorite" ${m.favorite ? "checked" : ""}></label>
-      <button type="button" class="btn ghost block" id="to-grocery" style="margin-top:12px"><i data-lucide="shopping-basket"></i>Masalliqlarni Ro'zg'orga yuborish</button>
-    </form>`,
-    foot: `${isNew ? `<button class="btn ghost" data-close>Bekor qilish</button>` : `<button class="btn danger" data-del aria-label="Taomni o'chirish"><i data-lucide="trash-2"></i></button>`}<button class="btn primary" data-save>${isNew ? `Qo'shish <span class="emo" aria-hidden="true">😋</span>` : "Saqlash"}</button>`,
-    onMount(el, api) {
-      const f = $("#mform", el);
-      const drawIngs = () => {
-        $("#ing-list", el).innerHTML = ings.map((g, i) => ingChip(g, `<button type="button" data-rm="${i}" aria-label="${esc(g)} ni olib tashlash"><i data-lucide="x" style="width:14px;height:14px"></i></button>`)).join("");
-        $("#to-grocery", el).hidden = !ings.length;
-        icons();
-      };
-      const addIng = () => {
-        const inp = $("#ing-in", el);
-        inp.value.split(",").map((x) => x.trim()).filter(Boolean).forEach((x) => { if (!ings.some((g) => g.toLowerCase() === x.toLowerCase())) ings.push(x); });
-        inp.value = ""; drawIngs(); inp.focus();
-      };
-      drawIngs();
-      $("#ing-add", el).addEventListener("click", addIng);
-      $("#ing-in", el).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIng(); } });
-      $("#ing-list", el).addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (b) { ings.splice(+b.dataset.rm, 1); drawIngs(); } });
-      // Reusing a known meal fills its ingredients
-      f.elements.title.addEventListener("change", () => {
-        const known = [...meals].reverse().find((x) => x.title.toLowerCase() === f.elements.title.value.trim().toLowerCase());
-        if (known && !ings.length) { ings = [...(known.ingredients || [])]; if (!f.elements.description.value) f.elements.description.value = known.description || ""; if (!f.elements.notes.value) f.elements.notes.value = known.notes || ""; drawIngs(); }
-      });
-      f.elements.title.addEventListener("input", () => ($("#m-err", el).hidden = true));
-      $("#to-grocery", el).addEventListener("click", () => sendToGrocery(ings, f.elements.title.value.trim() || "taom"));
-
-      const save = async () => {
-        if ($("#ing-in", el).value.trim()) addIng();
-        const v = { title: f.elements.title.value.trim(), day_date: f.elements.day_date.value || selected, slot: f.elements.slot.value, description: f.elements.description.value.trim(), notes: f.elements.notes.value.trim(), favorite: f.elements.favorite.checked, ingredients: ings };
-        if (!v.title) { $("#m-err", el).hidden = false; f.elements.title.focus(); return; }
-        $("[data-save]", el).disabled = true;
-        try {
-          if (isNew) {
-            await Store.insert("meals", { ...v, created_by: Store.ctx.profile.id });
-            Store.notify("meal_added", { meal: v.title, slot: v.slot, day: App.WEEKDAYS[App.parseYmd(v.day_date).getDay()], slotName: slotName(v.slot) }, "taomlar.html");
-            App.toast(`«${v.title}» rejaga qo'shildi`);
-          } else {
-            await Store.update("meals", m.id, v);
-            App.toast("Saqlandi");
-          }
-          selected = v.day_date; api.close(); render();
-        } catch (e) { App.fail(e); $("[data-save]", el).disabled = false; }
-      };
-      $("[data-save]", el).addEventListener("click", save);
-      f.addEventListener("submit", (e) => { e.preventDefault(); save(); });
-      const del = $("[data-del]", el);
-      if (del) del.addEventListener("click", async () => {
-        api.close();
-        if (!(await App.confirm(`«${m.title}» menyudan olib tashlanadi.`, "Taomni o'chirish"))) return;
-        try { await Store.remove("meals", m.id); App.toast("O'chirildi", "trash-2"); render(); } catch (e) { App.fail(e); }
-      });
-    },
-  });
+// Last day each dish was cooked (planned on a day up to today), by normalised name.
+function lastMadeOf(title) {
+  const t = App.today(), k = Stickers.normalize(title);
+  return meals.filter((m) => m.day_date <= t && Stickers.normalize(m.title) === k).reduce((acc, m) => (!acc || m.day_date > acc ? m.day_date : acc), null);
 }
+const daysSince = (d) => Math.round((App.parseYmd(App.today()) - App.parseYmd(d)) / 86400000);
 
 /* ---------- send ingredients to Ro'zg'or ---------- */
 function sendToGrocery(ings, mealTitle) {
@@ -331,11 +220,11 @@ function drawRecipes() {
     pane.innerHTML = `<div class="empty recipe-empty"><div class="ico emo" aria-hidden="true">🛠️</div><strong>Retseptlar uchun serverni sozlang</strong><p>Supabase → SQL Editor'da <b>supabase/recipes.sql</b> faylini bir marta ishga tushiring.</p></div>`;
     return;
   }
-  pane.innerHTML = `<button class="btn primary recipe-add" id="recipe-add"><i data-lucide="plus"></i>Retsept qo'shish</button>` +
+  pane.innerHTML = `<button class="btn primary recipe-add" id="recipe-add"><i data-lucide="plus"></i>Taom qo'shish</button>` +
     (recipes.length ? `<div class="recipes">${recipes.map((r) => `<button class="recipe-card" data-rid="${r.id}">
         <span class="ph">${recipeUrls[r.photo_path] ? `<img src="${esc(recipeUrls[r.photo_path])}" alt="">` : `<span class="emo" aria-hidden="true">${r.emoji || dishEmoji(r.title)}</span>`}</span>
-        <span class="tx"><span class="tt">${esc(r.title)}</span><span class="mt">${(r.ingredients || []).length} masalliq</span></span></button>`).join("")}</div>`
-      : `<div class="empty recipe-empty"><div class="ico emo" aria-hidden="true">📖</div><strong>Hali retsept yo'q</strong><p>Sevimli taomlaringizni rasm va tayyorlash usuli bilan saqlang.</p></div>`);
+        <span class="tx"><span class="tt">${esc(r.title)}</span><span class="mt">${(r.ingredients || []).length} masalliq · ${lastMadeOf(r.title) ? (daysSince(lastMadeOf(r.title)) === 0 ? "bugun" : `${daysSince(lastMadeOf(r.title))} kun oldin`) : "hali pishirilmagan"}</span></span></button>`).join("")}</div>`
+      : `<div class="empty recipe-empty"><div class="ico emo" aria-hidden="true">📖</div><strong>Hali taom yo'q</strong><p>Oilangiz yaxshi ko'radigan taomlarni rasmi va retsepti bilan qo'shing.</p></div>`);
   icons();
 }
 $("#recipes-pane").addEventListener("click", (e) => {
@@ -349,8 +238,7 @@ async function addMealToday(src, slot) {
   const row = { title: src.title, day_date: App.today(), slot, description: steps.split("\n")[0].slice(0, 120), ingredients: [...(src.ingredients || [])], notes: steps, favorite: false, created_by: Store.ctx.profile.id };
   await Store.insert("meals", row);
   Store.notify("meal_added", { meal: row.title, slot, day: App.WEEKDAYS[App.parseYmd(row.day_date).getDay()], slotName: slotName(slot) }, "taomlar.html");
-  App.toast(`«${row.title}» bugungi ${slotName(slot).toLowerCase()}ga qo'shildi 🍽️`);
-  selected = row.day_date;
+  App.toast(`Bugun «${row.title}» pishiriladi 😋`);
   await render();
 }
 
@@ -372,13 +260,13 @@ function pickSlot(title, onPick) {
 function openRecipe(r) {
   if (!r) return;
   App.sheet({
-    title: "Retsept 📖",
+    title: "Taom 🍲",
     body: `<div class="recipe-detail">
         <div class="hero">${recipeUrls[r.photo_path] ? `<img src="${esc(recipeUrls[r.photo_path])}" alt="${esc(r.title)}">` : `<span class="emo" aria-hidden="true">${r.emoji || dishEmoji(r.title)}</span>`}</div>
         <h2>${esc(r.title)}</h2>
         ${(r.ingredients || []).length ? `<div class="ings">${r.ingredients.map(recipeChip).join("")}</div>` : ""}
         ${r.steps ? `<p class="steps">${esc(r.steps)}</p>` : ""}
-        <button class="btn primary block" data-today style="margin-top:16px"><i data-lucide="calendar-plus"></i>Bugungi menyuga qo'shish</button>
+        <button class="btn primary block" data-today style="margin-top:16px"><span class="emo" aria-hidden="true">🍳</span> Bugun shu pishiriladi</button>
         ${(r.ingredients || []).length ? `<button class="btn ghost block" data-to-grocery style="margin-top:10px"><i data-lucide="shopping-basket"></i>Masalliqlarni Ro'zg'orga</button>` : ""}
       </div>`,
     foot: `<button class="btn danger" data-del-recipe aria-label="Retseptni o'chirish"><i data-lucide="trash-2"></i></button><button class="btn ghost" data-edit-recipe><i data-lucide="pencil"></i>Tahrirlash</button>`,
@@ -409,7 +297,7 @@ function openRecipeEditor(r) {
   let cat = RECIPE_CATS[0].id, blob = null;
   const norm = (n) => Stickers.normalize(n);
   App.sheet({
-    title: isNew ? "Yangi retsept 📖" : "Retseptni tahrirlash ✏️",
+    title: isNew ? "Yangi taom 🍲" : "Taomni tahrirlash ✏️",
     body: `<form id="rform" novalidate>
       <div class="field"><span class="label">Rasm</span>
         <label class="drop" id="r-drop">${recipeUrls[it.photo_path] ? `<img src="${esc(recipeUrls[it.photo_path])}" alt=""><span class="change">Almashtirish</span>` : `<span><span class="emo" style="font-size:30px" aria-hidden="true">📷</span><br>Rasm tanlash</span>`}
@@ -418,7 +306,7 @@ function openRecipeEditor(r) {
       <div class="field"><label for="r-ings">Masalliqlar</label><input class="input" id="r-ings" value="${esc((it.ingredients || []).join(", "))}" autocomplete="off" placeholder="pastdan tanlang yoki yozing, vergul bilan">
         <div class="r-cats" id="r-cats" role="group" aria-label="Turkum" style="margin-top:10px"></div>
         <div class="r-picks" id="r-picks" role="group" aria-label="Masalliqlar" style="margin-top:10px"></div></div>
-      <div class="field"><label for="r-steps">Tayyorlash</label><textarea class="textarea" id="r-steps" rows="6" maxlength="4000" placeholder="1. ...">${esc(it.steps || "")}</textarea></div>
+      <div class="field"><label for="r-steps">Retsept — tayyorlash</label><textarea class="textarea" id="r-steps" rows="6" maxlength="4000" placeholder="1. ...">${esc(it.steps || "")}</textarea></div>
     </form>`,
     foot: `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn primary" data-save>${isNew ? "Saqlash" : "O'zgarishlarni saqlash"}</button>`,
     onMount(el, api) {
@@ -459,7 +347,7 @@ function openRecipeEditor(r) {
           if (isNew) await Store.insert("recipes", { ...v, photo_path: v.photo_path || null, created_by: Store.ctx.profile.id });
           else await Store.update("recipes", it.id, v);
           api.close(); await render();
-          App.toast(photoLost ? "Rasm yuklanmadi — retsept rasmsiz saqlandi" : isNew ? `«${title}» retsepti saqlandi 📖` : "Saqlandi", photoLost ? "image-off" : "check");
+          App.toast(photoLost ? "Rasm yuklanmadi — retsept rasmsiz saqlandi" : isNew ? `«${title}» saqlandi 🍲` : "Saqlandi", photoLost ? "image-off" : "check");
         } catch (err) { App.fail(err); btn.disabled = false; btn.textContent = "Saqlash"; }
       });
     },
@@ -478,8 +366,8 @@ function openSuggestions() {
       const box = $("[data-sugg]", el);
       const draw = () => {
         if (!all.length) {
-          box.innerHTML = `<div class="empty"><div class="ico emo" aria-hidden="true">📖</div><strong>Hali taklif qiladigan taom yo'q</strong><p>Retsept qo'shing yoki menyuni to'ldiring — keyin men eslatib turaman.</p>
-            <button class="btn primary" data-suggest-add><i data-lucide="plus"></i>Retsept qo'shish</button></div>`;
+          box.innerHTML = `<div class="empty"><div class="ico emo" aria-hidden="true">📖</div><strong>Hali taklif qiladigan taom yo'q</strong><p>Taomlaringizni qo'shing — keyin qaysi biri ko'pdan beri pishirilmaganini eslatib turaman.</p>
+            <button class="btn primary" data-suggest-add><i data-lucide="plus"></i>Taom qo'shish</button></div>`;
           return icons();
         }
         const chunk = all.slice(page * 3, page * 3 + 3);
@@ -492,7 +380,7 @@ function openSuggestions() {
       };
       draw();
       box.addEventListener("click", (e) => {
-        if (e.target.closest("[data-suggest-add]")) { api.close(); setTab("recipes"); return setTimeout(() => openRecipeEditor(), 300); }
+        if (e.target.closest("[data-suggest-add]")) { api.close(); return setTimeout(() => openRecipeEditor(), 300); }
         if (e.target.closest("[data-more]")) { page = (page + 1) * 3 >= all.length ? 0 : page + 1; return draw(); }
         const c = e.target.closest("[data-i]"); if (!c) return;
         const x = all[+c.dataset.i];
@@ -505,38 +393,8 @@ function openSuggestions() {
 }
 $("#suggest-btn").addEventListener("click", openSuggestions);
 
-/* ---------- favorites & past meals ---------- */
-function uniqueMeals(list) {
-  const seen = new Map();
-  [...list].sort((a, b) => (a.day_date < b.day_date ? 1 : -1)).forEach((m) => { const k = m.title.toLowerCase(); if (!seen.has(k)) seen.set(k, m); });
-  return [...seen.values()];
-}
-function openLibrary(kind) {
-  const list = kind === "fav" ? uniqueMeals(meals.filter((m) => m.favorite)) : uniqueMeals(meals.filter((m) => m.day_date < App.today()));
-  App.sheet({
-    title: kind === "fav" ? "Sevimli taomlar" : "Avvalgi taomlar",
-    body: list.length ? `<p class="hint" style="margin:0 0 6px">Taomni tanlang — u ${App.fmtShort(selected).toLowerCase()} uchun rejaga qo'shiladi.</p><div class="list">${list.map((m) => `
-        <button class="row" data-id="${m.id}" style="width:100%;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;padding:12px 2px">
-          <div class="grow"><div class="title">${esc(m.title)}</div><div class="meta">${slotName(m.slot)} · ${App.fmtDate(m.day_date)}${m.ingredients && m.ingredients.length ? ` · ${m.ingredients.length} masalliq` : ""}</div></div>
-          <i data-lucide="calendar-plus" style="color:var(--accent)"></i></button>`).join("")}</div>`
-      : `<div class="empty"><div class="ico emo" aria-hidden="true">${kind === "fav" ? "⭐" : "📖"}</div><strong>${kind === "fav" ? "Sevimlilar yo'q" : "Hali tarix yo'q"}</strong><p>${kind === "fav" ? "Taomni ochib, «Sevimli taom»ni yoqing." : "O'tgan kunlar uchun rejalashtirilgan taomlar shu yerda ko'rinadi."}</p></div>`,
-    onMount(el, api) {
-      el.addEventListener("click", (e) => {
-        const b = e.target.closest("[data-id]"); if (!b) return;
-        const src = meals.find((x) => x.id === b.dataset.id);
-        api.close();
-        setTimeout(() => openEditor(null, { title: src.title, description: src.description, ingredients: [...(src.ingredients || [])], notes: src.notes, favorite: src.favorite, slot: src.slot, day_date: selected }), 300);
-      });
-    },
-  });
-}
-$("#fav-btn").addEventListener("click", () => openLibrary("fav"));
-$("#past-btn").addEventListener("click", () => openLibrary("past"));
-
-draw();
-setTab(tab);
-App.boot({ page: "taomlar", title: "Taomlar", emoji: "🍲", sub: "Haftalik oilaviy reja", tables: ["meals", "grocery_items", "recipes"], render }).then(() => {
-  if (new URLSearchParams(location.search).get("new")) openEditor();
+App.boot({ page: "taomlar", title: "Taomlar", emoji: "🍲", sub: "Oilamiz taomlari va retseptlari", tables: ["meals", "grocery_items", "recipes"], render }).then(() => {
+  if (new URLSearchParams(location.search).get("new")) openRecipeEditor();
 });
 </script>
 </body>

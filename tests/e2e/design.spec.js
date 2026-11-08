@@ -115,11 +115,11 @@ const PAGES = [
   assert.ok(wob.progress >= 250, "wobble-in resumed (progress >= 250ms), not restarted: " + JSON.stringify(wob));
   await page.emulateMedia({ reducedMotion: "reduce" });
 
-  // Taomlar: ingredient chips carry stickers.
+  // Taomlar: today's meal shows in the "Bugun pishiriladi" strip.
   await page.goto(BASE + "/taomlar.html");
-  await page.waitForSelector(".ings .chip"); // demo seed: today's "Tovuq sho'rva" uses Sabzi
-  const chip = await page.locator(".ings .chip", { hasText: "Sabzi" }).first().textContent();
-  assert.ok(chip.includes("🥕"), "ingredient chip sticker: " + chip);
+  await page.waitForSelector("#today-strip .chip"); // demo seed: today's "Tovuq sho'rva"
+  const chip = await page.locator("#today-strip .chip", { hasText: "Tovuq sho'rva" }).first().textContent();
+  assert.ok(chip.includes("Tovuq sho'rva"), "today strip: " + chip);
 
   // Home: recent activity naming a product in «…» shows its sticker.
   // Seed has Sabzi already "kerak": un-mark, then mark again so the wife's activity names it.
