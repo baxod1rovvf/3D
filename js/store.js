@@ -11,7 +11,7 @@
  */
 (function () {
   const cfg = window.OILA_CONFIG || {};
-  const TABLES = ["grocery_items", "meals", "memories", "tasks", "notifications", "activity"];
+  const TABLES = ["grocery_items", "meals", "memories", "tasks", "notifications", "activity", "recipes"];
 
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-" + Date.now() + Math.random().toString(16).slice(2));
   const nowIso = () => new Date().toISOString();
@@ -462,32 +462,32 @@
       },
 
       async list(table, opts = {}) {
-        let rows = read()[table].slice();
+        let rows = (read()[table] || []).slice(); // tables added later (recipes) may be missing in older demo data
         if (table === "notifications") rows = rows.filter((r) => r.recipient_id === Device.me());
         return sortRows(rows, opts);
       },
       async insert(table, row) {
         const data = read();
         const full = { id: uid(), household_id: HH, created_at: nowIso(), ...row };
-        data[table].push(full); write(data); emit(table, { eventType: "INSERT", new: full });
+        (data[table] = data[table] || []).push(full); write(data); emit(table, { eventType: "INSERT", new: full });
         return full;
       },
       async insertMany(table, rows) { const out = []; for (const r of rows) out.push(await this.insert(table, r)); return out; },
       async update(table, id, patch) {
         const data = read();
-        const r = data[table].find((x) => x.id === id);
+        const r = (data[table] || []).find((x) => x.id === id);
         if (!r) throw new Error("Topilmadi");
         Object.assign(r, patch); write(data); emit(table, { eventType: "UPDATE", new: r });
         return r;
       },
       async updateWhere(table, match, patch) {
         const data = read();
-        data[table].forEach((r) => { if (Object.keys(match).every((k) => r[k] === match[k])) Object.assign(r, patch); });
+        (data[table] || []).forEach((r) => { if (Object.keys(match).every((k) => r[k] === match[k])) Object.assign(r, patch); });
         write(data); emit(table, { eventType: "UPDATE", new: {} });
       },
       async remove(table, id) {
         const data = read();
-        data[table] = data[table].filter((x) => x.id !== id); write(data); emit(table, { eventType: "DELETE", old: { id } });
+        data[table] = (data[table] || []).filter((x) => x.id !== id); write(data); emit(table, { eventType: "DELETE", old: { id } });
       },
       subscribe(tables, cb) {
         const l = (t, p) => { if (t === "*" || tables.includes(t)) cb(t, p); };

@@ -5,7 +5,7 @@
 // There are no accounts. Every request carries the family's secret key (header X-Family-Key,
 // or ?k= for photos), and every query is limited to rows of that family.
 
-const TABLES = ["profiles", "grocery_items", "meals", "memories", "tasks", "activity", "notifications"];
+const TABLES = ["profiles", "grocery_items", "meals", "memories", "tasks", "activity", "notifications", "recipes"];
 const MAX_PHOTO_BYTES = 1_900_000; // D1 row limit is 2 MB; the app compresses photos well below this
 
 const SCHEMA = [
