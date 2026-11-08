@@ -62,9 +62,23 @@ const LUCIDE = process.env.LUCIDE_PATH || "/tmp/claude-0/-home-user-3D/600534e3-
   await wife.click(".sheet [data-save]"); await wife.waitForTimeout(500);
   assert.strictEqual((await row("Nimesil")).category, "dori");
 
+  // Paratsetamol is already "kerak": adding it again with a new alternative updates the note
+  await wife.click("#add"); await wife.waitForSelector(".sheet.open #a-own");
+  await wife.click('.sheet [data-cat="dori"]'); await wife.fill("#a-own", "Paratsetamol");
+  await wife.fill("#a-alt", "Analgin");
+  await wife.click(".sheet [data-save]"); await wife.waitForTimeout(500);
+  assert.strictEqual((await row("Paratsetamol")).note, "yo'q bo'lsa: Analgin", "alternative updated on an item already needed");
+  await wife.goto(BASE + "/rozgor.html"); await wife.waitForSelector(".g-row");
+  const nB = (await needs()).length;
+  await wife.goto(BASE + "/index.html"); await wife.waitForFunction(() => window.Store && Store.ctx); await wife.waitForTimeout(400);
+  got = await needs();
+  assert.match(got[got.length - 1], /Paratsetamol \(yo'q bo'lsa — Analgin\)/, got.slice(-2).join(" | "));
+  assert.ok(got.length <= nB + 1, "one notification for the update");
+  await wife.goto(BASE + "/rozgor.html"); await wife.waitForSelector(".g-row");
+
   // shopping mode shows the replacement
   await wife.click('[data-view="need"]'); await wife.click("#shop-open"); await wife.waitForSelector(".shop-item");
-  assert.match(await wife.locator(".shop-item", { hasText: "Paratsetamol" }).textContent(), /🔁 Ibuprofen/);
+  assert.match(await wife.locator(".shop-item", { hasText: "Paratsetamol" }).textContent(), /🔁 Analgin/);
   assert.deepEqual(errors, []);
   console.log("PASS dorilar.spec");
   await browser.close();

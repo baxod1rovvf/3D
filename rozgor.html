@@ -525,7 +525,15 @@ function openAdder() {
             // The replacement belongs to medicines only (catalogue medicines, or typed under Dorilar).
             const note = alt && (Catalog.isMedicine(name) || (!known && cat === "dori")) ? ALT_PREFIX + alt : null;
             const found = items.find((i) => norm(i.name) === norm(name));
-            if (found && found.status === "kerak") continue;
+            if (found && found.status === "kerak") {
+              // Already needed: only a new replacement changes anything.
+              if (!note || note === found.note) continue;
+              await Store.update("grocery_items", found.id, { note });
+              App.unqueueGrocery("grocery_need", notifName(found));
+              App.queueGrocery("grocery_need", notifName({ name, note }));
+              added++;
+              continue;
+            }
             if (found) await Store.update("grocery_items", found.id, { status: "kerak", marked_by: me, marked_at: now, purchased_by: null, purchased_at: null, ...(note ? { note } : {}) });
             else {
               const row = await Store.insert("grocery_items", { name, category, quantity: "", note: note || "", urgent: false, status: "kerak", added_by: me, marked_by: me, marked_at: now });
