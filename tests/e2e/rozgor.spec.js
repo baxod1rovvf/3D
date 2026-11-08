@@ -38,7 +38,7 @@ const LUCIDE = process.env.LUCIDE_PATH || "/tmp/claude-0/-home-user-3D/600534e3-
   await wife.click("#add"); await wife.waitForSelector(".sheet.open #a-own");
   const sheetText = await wife.textContent(".sheet");
   assert.ok(!/Shoshilinch|Hozir kerak/.test(sheetText), "no urgent / needed toggles when adding");
-  assert.strictEqual(await wife.locator(".sheet [data-cat]").count(), 9, "nine categories");
+  assert.strictEqual(await wife.locator(".sheet [data-cat]").count(), 10, "ten categories (incl. Dorilar)");
   await wife.click('.sheet [data-cat="gigiyena"]');
   assert.ok(await wife.evaluate(() => { const r = document.querySelector("#a-cats"); return r.scrollHeight < 70 && r.scrollWidth > r.clientWidth; }), "categories sit on one scrolling line");
   for (const n of ["Sovun", "Tish pastasi", "Bolalar tagligi (pampers)"]) await wife.click(`.sheet [data-pick="${n}"]`);

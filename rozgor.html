@@ -81,6 +81,7 @@
   .shop-cat { margin: 16px 2px 8px; font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .shop-item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 68px; margin-bottom: 8px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 20px; background: var(--surface); text-align: left; color: var(--ink); }
   .shop-item .nm { flex: 1; font-size: 18px; font-weight: 800; }
+  .shop-item .nm .alt { display: block; margin-top: 2px; font-size: 15px; font-weight: 800; color: var(--accent-ink); }
   .shop-item .nm small { display: block; font-size: 13px; font-weight: 600; color: var(--muted); }
   .shop-item .box { width: 40px; height: 40px; flex: none; border-radius: 50%; border: 3px solid var(--accent-ink); display: grid; place-items: center; font-size: 22px; color: transparent; }
   .shop-item.got { opacity: .6; background: var(--accent-soft); }
@@ -165,7 +166,12 @@
 const { $, $$, esc, icons } = App;
 const CATS = Catalog.CATEGORIES;
 const catOf = (id) => CATS.find((c) => c.id === id) || CATS[CATS.length - 1];
-const emojiFor = (name, cat) => (Catalog.find(name) || {}).emoji || Stickers.forName(name, cat);
+const emojiFor = (name, cat) => (Catalog.find(name) || {}).emoji || (cat === "dori" ? "💊" : Stickers.forName(name, cat));
+// Medicines carry a replacement in their note: "yo'q bo'lsa: Ibuprofen".
+const ALT_PREFIX = "yo'q bo'lsa: ";
+const altOf = (item) => (item && item.note && item.note.startsWith(ALT_PREFIX) ? item.note.slice(ALT_PREFIX.length).trim() || null : null);
+// The name used in notifications (and to un-queue them): "Paratsetamol (yo'q bo'lsa — Ibuprofen)".
+const notifName = (item) => (altOf(item) ? `${item.name} (yo'q bo'lsa — ${altOf(item)})` : item.name);
 const stickerOf = (i) => emojiFor(i.name, catOf(i.category).id);
 const sticker = (i) => `<span class="sticker" aria-hidden="true">${stickerOf(i)}</span>`;
 // The row just added wobbles in once. Realtime re-renders replace #list within the animation's
@@ -297,7 +303,7 @@ const UNDO_FIELDS = ["status", "marked_by", "marked_at", "purchased_by", "purcha
 const snapshot = (item) => Object.fromEntries(UNDO_FIELDS.map((k) => [k, item[k] ?? null]));
 function offerUndo(text, item, before, unqueue) {
   App.undoToast(text, async () => {
-    if (unqueue) App.unqueueGrocery(unqueue, item.name);
+    if (unqueue) App.unqueueGrocery(unqueue, notifName(item));
     try { await Store.update("grocery_items", item.id, before); Object.assign(item, before); render(); }
     catch (err) { App.fail(err); }
   }, "undo-2");
@@ -319,8 +325,8 @@ $("#list").addEventListener("click", async (e) => {
       await Store.update("grocery_items", item.id, toNeed
         ? { status: "kerak", marked_by: me, marked_at: item.marked_at, purchased_by: null, purchased_at: null }
         : { status: "bor", marked_by: null, marked_at: null });
-      if (toNeed) App.queueGrocery("grocery_need", item.name);
-      else App.unqueueGrocery("grocery_need", item.name);
+      if (toNeed) App.queueGrocery("grocery_need", notifName(item));
+      else App.unqueueGrocery("grocery_need", notifName(item));
       offerUndo(toNeed ? `«${item.name}» — kerak` : `«${item.name}» — uyda bor`, item, before, toNeed ? "grocery_need" : null);
     } catch (err) { App.fail(err); }
     draw();
@@ -331,7 +337,7 @@ $("#list").addEventListener("click", async (e) => {
     if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
     try {
       await Store.update("grocery_items", item.id, { status: "olindi", purchased_by: me, purchased_at: new Date().toISOString() });
-      App.queueGrocery("grocery_bought", item.name);
+      App.queueGrocery("grocery_bought", notifName(item));
       offerUndo(`«${item.name}» olindi ✅`, item, before, "grocery_bought");
     } catch (err) { App.fail(err); row.classList.remove("leaving"); btn.classList.remove("on"); }
   } else if (e.target.closest("[data-restock]")) {
@@ -372,7 +378,7 @@ async function openShop() {
       if (!inCat.length) return "";
       return `<div class="shop-cat">${c.emoji} ${esc(c.name)}</div>` + inCat.map((x) => `<button class="shop-item ${x.got ? "got" : ""}" data-sid="${x.item.id}" aria-pressed="${x.got}">
         <span class="sticker" aria-hidden="true">${stickerOf(x.item)}</span>
-        <span class="nm">${esc(x.item.name)}${x.item.quantity || x.item.note ? `<small>${esc([x.item.quantity, x.item.note].filter(Boolean).join(" · "))}</small>` : ""}</span>
+        <span class="nm">${esc(x.item.name)}${x.item.quantity || (x.item.note && !altOf(x.item)) ? `<small>${esc([x.item.quantity, altOf(x.item) ? "" : x.item.note].filter(Boolean).join(" · "))}</small>` : ""}${altOf(x.item) ? `<span class="alt">🔁 ${esc(altOf(x.item))}</span>` : ""}</span>
         <span class="box" aria-hidden="true">✓</span></button>`).join("");
     }).join("");
     el.innerHTML = `<div class="shop-head"><h2>Do'kondaman 🛍️</h2><button class="icon-btn" data-close-shop aria-label="Yopish"><i data-lucide="x"></i></button></div>
@@ -392,10 +398,10 @@ async function openShop() {
     try {
       if (x.got) {
         await Store.update("grocery_items", x.item.id, { status: "olindi", purchased_by: me, purchased_at: new Date().toISOString() });
-        App.queueGrocery("grocery_bought", x.item.name);
+        App.queueGrocery("grocery_bought", notifName(x.item));
       } else {
         await Store.update("grocery_items", x.item.id, { status: "kerak", purchased_by: null, purchased_at: null });
-        App.unqueueGrocery("grocery_bought", x.item.name);
+        App.unqueueGrocery("grocery_bought", notifName(x.item));
       }
     } catch (err) { x.got = !x.got; draw(); App.fail(err); }
   });
@@ -457,6 +463,9 @@ function openAdder() {
     body: `<div class="field"><label for="a-own">Mahsulot nomi</label>
         <div class="name-row"><span class="sticker lg sticker-preview" id="a-sticker" aria-hidden="true">🛒</span><input class="input" id="a-own" autocomplete="off" maxlength="200" placeholder="masalan, Sabzi, Piyoz" autofocus></div>
         <span class="hint">Pastdan tanlang yoki o'zingiz yozing. Bir nechta bo'lsa — vergul bilan.</span></div>
+      <div class="field" id="a-alt-field" hidden><label for="a-alt">💊 Agar u yo'q bo'lsa…</label>
+        <input class="input" id="a-alt" autocomplete="off" maxlength="60" placeholder="o'rniga nima olsa bo'ladi? masalan, Ibuprofen">
+        <span class="hint">Dorixonada bo'lmasa, juftingiz shuni oladi.</span></div>
       <div class="step-label"><b>1</b>Turkum</div>
       <div class="cat-strip" id="a-cats" role="group" aria-label="Turkum"></div>
       <div class="step-label"><b>2</b>Mahsulotni tanlang</div>
@@ -473,6 +482,7 @@ function openAdder() {
         const e = list.length ? emojiFor(list[list.length - 1], cat) : "🛒";
         if (stk.textContent !== e) { stk.textContent = e; stk.classList.remove("pop"); void stk.offsetWidth; stk.classList.add("pop"); }
         $$("[data-pick]", el).forEach((b) => b.setAttribute("aria-pressed", has(b.dataset.pick)));
+        $("#a-alt-field", el).hidden = !(cat === "dori" || list.some((x) => Catalog.isMedicine(x)));
       };
       const drawCats = () => {
         $("#a-cats", el).innerHTML = CATS.map((c) => `<button type="button" data-cat="${c.id}" aria-pressed="${c.id === cat}"><span class="emo" aria-hidden="true">${c.emoji}</span>${esc(c.name)}</button>`).join("");
@@ -504,19 +514,23 @@ function openAdder() {
         if (!list.length) return;
         save.disabled = true;
         const me = Store.ctx.profile.id, now = new Date().toISOString();
+        const alt = $("#a-alt-field", el).hidden ? "" : $("#a-alt", el).value.trim();
         let added = 0;
         try {
           for (const typed of list) {
             const known = Catalog.find(typed);
             const name = known ? known.name : typed;
+            const category = known ? known.category : cat;
+            // The replacement belongs to medicines only (catalogue medicines, or typed under Dorilar).
+            const note = alt && (Catalog.isMedicine(name) || (!known && cat === "dori")) ? ALT_PREFIX + alt : null;
             const found = items.find((i) => norm(i.name) === norm(name));
             if (found && found.status === "kerak") continue;
-            if (found) await Store.update("grocery_items", found.id, { status: "kerak", marked_by: me, marked_at: now, purchased_by: null, purchased_at: null });
+            if (found) await Store.update("grocery_items", found.id, { status: "kerak", marked_by: me, marked_at: now, purchased_by: null, purchased_at: null, ...(note ? { note } : {}) });
             else {
-              const row = await Store.insert("grocery_items", { name, category: known ? known.category : cat, quantity: "", note: "", urgent: false, status: "kerak", added_by: me, marked_by: me, marked_at: now });
+              const row = await Store.insert("grocery_items", { name, category, quantity: "", note: note || "", urgent: false, status: "kerak", added_by: me, marked_by: me, marked_at: now });
               if (row && row.id) fresh = { id: row.id, t0: null };
             }
-            App.queueGrocery("grocery_need", name);
+            App.queueGrocery("grocery_need", notifName({ name, note: note || (found && found.note) }));
             added++;
           }
           App.toast(added ? `${added === 1 ? `«${list[0]}»` : `${added} ta mahsulot`} «Kerak» ro'yxatiga qo'shildi 🛒` : "Bular allaqachon ro'yxatda ✓", "shopping-basket");
